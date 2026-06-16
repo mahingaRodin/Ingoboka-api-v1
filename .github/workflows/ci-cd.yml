@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
