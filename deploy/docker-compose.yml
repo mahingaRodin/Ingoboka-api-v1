@@ -1,0 +1,91 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ingoboka-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ingoboka}
+      POSTGRES_USER: ${POSTGRES_USER:-ingoboka}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ingoboka}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ingoboka-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ingoboka} -d ${POSTGRES_DB:-ingoboka}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ingoboka-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - ingoboka-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: ingoboka-mailhog
+    restart: unless-stopped
+    profiles:
+      - dev
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"
+      - "${MAILHOG_UI_PORT:-8025}:8025"
+    networks:
+      - ingoboka-net
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: ingoboka-api:${IMAGE_TAG:-latest}
+    container_name: ingoboka-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ingoboka}
+      DB_USERNAME: ${POSTGRES_USER:-ingoboka}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ingoboka}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
+      MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-true}
+      SEED_PLATFORM_ADMIN: ${SEED_PLATFORM_ADMIN:-true}
+    ports:
+      - "${API_PORT:-8085}:8080"
+    networks:
+      - ingoboka-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+networks:
+  ingoboka-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
