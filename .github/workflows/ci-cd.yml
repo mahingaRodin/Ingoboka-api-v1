@@ -1,0 +1,70 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  JAVA_VERSION: '21'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build and test
+        run: ./mvnw clean verify -B -Dintegration=true
+
+      - name: Build Docker image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: docker build -t ingoboka-api:${{ github.sha }} .
+
+  deploy:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare deployment bundle
+        run: |
+          mkdir -p bundle/deploy
+          cp Dockerfile bundle/
+          cp -r deploy/* bundle/deploy/
+          cp pom.xml mvnw mvnw.cmd bundle/ 2>/dev/null || true
+          cp -r .mvn src bundle/
+          tar -czf ingoboka-deploy.tar.gz -C bundle .
+
+      - name: Copy bundle to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: ingoboka-deploy.tar.gz
+          target: /opt/ingoboka
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            mkdir -p /opt/ingoboka/deploy
+            cd /opt/ingoboka
+            tar -xzf ingoboka-deploy.tar.gz
+            cd deploy
+            docker compose up -d --build --remove-orphans
+            docker compose ps
