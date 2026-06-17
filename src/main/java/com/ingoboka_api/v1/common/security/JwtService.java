@@ -73,10 +73,22 @@ public class JwtService {
         if (secret == null || secret.isBlank()) {
             throw new IllegalStateException("JWT secret is not configured");
         }
+        byte[] bytes = looksLikeBase64(secret) ? decodeBase64OrUtf8(secret) : secret.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length < 32) {
+            throw new IllegalStateException("JWT secret must be at least 256 bits (32 bytes)");
+        }
+        return bytes;
+    }
+
+    private static byte[] decodeBase64OrUtf8(String secret) {
         try {
             return Decoders.BASE64.decode(secret);
-        } catch (IllegalArgumentException ex) {
+        } catch (RuntimeException ex) {
             return secret.getBytes(StandardCharsets.UTF_8);
         }
+    }
+
+    private static boolean looksLikeBase64(String secret) {
+        return secret.matches("^[A-Za-z0-9+/]+=*$");
     }
 }
