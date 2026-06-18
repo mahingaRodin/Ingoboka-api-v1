@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/partners/{partnerId}/contracts")
+@RequestMapping("/api/v1/partners/{partnerId}/contracts")
 @RequiredArgsConstructor
 @Tag(name = "Partner Contracts", description = "B2B partner pricing and contract management")
 @SecurityRequirement(name = "bearerAuth")

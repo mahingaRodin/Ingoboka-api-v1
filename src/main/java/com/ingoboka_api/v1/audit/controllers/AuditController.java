@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api/audit", "/api/v1/audit"})
+@RequestMapping("/api/v1/audit")
 @RequiredArgsConstructor
 @Tag(name = "Audit & Compliance", description = "Immutable audit trail and compliance evidence")
 @SecurityRequirement(name = "bearerAuth")

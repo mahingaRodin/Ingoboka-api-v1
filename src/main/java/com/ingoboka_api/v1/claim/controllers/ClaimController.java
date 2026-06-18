@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/claims")
+@RequestMapping("/api/v1/claims")
 @RequiredArgsConstructor
 @Tag(name = "Claims & Appeals", description = "Claim intake, workflow, decisions, and appeals")
 @SecurityRequirement(name = "bearerAuth")

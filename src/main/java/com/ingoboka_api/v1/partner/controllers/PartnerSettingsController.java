@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api/insurer/settings", "/api/v1/insurer/settings", "/api/partners/me/settings"})
+@RequestMapping("/api/v1/insurer/settings")
 @RequiredArgsConstructor
 @Tag(name = "Insurer Settings", description = "Tenant organization configuration")
 @SecurityRequirement(name = "bearerAuth")

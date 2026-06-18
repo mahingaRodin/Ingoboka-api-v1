@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api/agent/dashboard", "/api/v1/agent/dashboard"})
+@RequestMapping("/api/v1/agent/dashboard")
 @RequiredArgsConstructor
 @Tag(name = "Agent Portal", description = "Field officer assisted enrollment dashboard")
 @SecurityRequirement(name = "bearerAuth")

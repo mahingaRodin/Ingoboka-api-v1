@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api/payments", "/api/v1/payments"})
+@RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
 @Tag(name = "Billing & Payment", description = "Premium payment initiation and sandbox provider callbacks")
 public class BillingController {

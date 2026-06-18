@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api/billing", "/api/v1/billing"})
+@RequestMapping("/api/v1/billing")
 @RequiredArgsConstructor
 @Tag(name = "Billing Finance", description = "Bills, receipts, refunds, and reconciliation")
 @SecurityRequirement(name = "bearerAuth")

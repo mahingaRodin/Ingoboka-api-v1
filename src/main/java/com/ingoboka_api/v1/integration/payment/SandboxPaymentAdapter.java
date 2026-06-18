@@ -20,7 +20,7 @@ public class SandboxPaymentAdapter implements PaymentProviderAdapter {
     public PaymentInitiationResult initiate(Payment payment, InitiatePaymentRequest request, String payerPhone) {
         return PaymentInitiationResult.builder()
                 .providerReference("PAY-" + UUID.randomUUID().toString().substring(0, 12).toUpperCase())
-                .instructions("Complete payment via POST /api/payments/webhooks/sandbox")
+                .instructions("Complete payment via POST /api/v1/payments/webhooks/sandbox")
                 .build();
     }
 }

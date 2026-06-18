@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api/policies", "/api/v1/policies"})
+@RequestMapping("/api/v1/policies")
 @RequiredArgsConstructor
 @Tag(name = "Policy Management", description = "Issued policies, members, documents, and QR verification")
 public class PolicyController {

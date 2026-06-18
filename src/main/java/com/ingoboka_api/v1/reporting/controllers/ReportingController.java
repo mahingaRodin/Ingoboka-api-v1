@@ -18,12 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({
-    "/api/partner/reports",
-    "/api/v1/partner/reports",
-    "/api/v1/insurer/reports",
-    "/api/insurer/reports"
-})
+@RequestMapping("/api/v1/reports")
 @RequiredArgsConstructor
 @Tag(name = "Reporting & Analytics", description = "Tenant operational dashboards and summaries")
 @SecurityRequirement(name = "bearerAuth")

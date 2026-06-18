@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/applications")
+@RequestMapping("/api/v1/applications")
 @RequiredArgsConstructor
 @Tag(name = "Quotation & Enrollment", description = "Quote generation, application submission, and insurer review")
 @SecurityRequirement(name = "bearerAuth")

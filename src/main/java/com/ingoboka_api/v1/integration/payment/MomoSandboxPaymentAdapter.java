@@ -34,7 +34,7 @@ public class MomoSandboxPaymentAdapter implements PaymentProviderAdapter {
                 .payerPhone(phone)
                 .instructions(
                         "Sandbox MoMo: approve payment on phone " + phone
-                                + ". Callback via POST /api/payments/webhooks/momo with externalId="
+                                + ". Callback via POST /api/v1/payments/webhooks/momo with externalId="
                                 + externalId)
                 .build();
     }

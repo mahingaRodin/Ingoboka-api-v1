@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api/customers/me", "/api/v1/customer/me", "/api/v1/customers/me"})
+@RequestMapping("/api/v1/customers/me")
 @RequiredArgsConstructor
 @Tag(name = "Customer Profile & Consent", description = "Citizen profile, dependants, and legal consent management")
 @SecurityRequirement(name = "bearerAuth")

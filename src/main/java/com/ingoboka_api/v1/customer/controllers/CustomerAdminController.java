@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api/customers", "/api/v1/customer", "/api/v1/customers"})
+@RequestMapping("/api/v1/customers")
 @RequiredArgsConstructor
 @Tag(name = "Customer Admin", description = "KYC and compliance operations on citizen profiles")
 @SecurityRequirement(name = "bearerAuth")

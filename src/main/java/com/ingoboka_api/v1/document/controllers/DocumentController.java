@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api/documents", "/api/v1/documents"})
+@RequestMapping("/api/v1/documents")
 @RequiredArgsConstructor
 @Tag(name = "Document Management", description = "Secure document metadata, checksums, and access control")
 @SecurityRequirement(name = "bearerAuth")

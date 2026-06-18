@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/integrations")
+@RequestMapping("/api/v1/integrations")
 @RequiredArgsConstructor
 @Tag(name = "Integration Adapters", description = "Payment, messaging, identity, and insurer-core connectors")
 @SecurityRequirement(name = "bearerAuth")
