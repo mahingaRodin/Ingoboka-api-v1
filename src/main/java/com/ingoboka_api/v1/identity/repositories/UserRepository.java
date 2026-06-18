@@ -5,6 +5,8 @@ import com.ingoboka_api.v1.identity.models.User;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -19,5 +21,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     List<User> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
+    Page<User> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId, Pageable pageable);
+
     Optional<User> findByIdAndOrganizationId(UUID id, UUID organizationId);
+
+    Optional<User> findByPhoneNumber(String phoneNumber);
 }

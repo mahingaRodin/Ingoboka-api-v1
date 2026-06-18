@@ -5,13 +5,16 @@ import com.ingoboka_api.v1.common.enums.KycStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.CreateDependantRequest;
 import com.ingoboka_api.v1.common.requests.GrantConsentRequest;
+import com.ingoboka_api.v1.common.requests.ReviewKycRequest;
 import com.ingoboka_api.v1.common.requests.UpdateCitizenProfileRequest;
 import com.ingoboka_api.v1.common.responses.CitizenProfileResponse;
 import com.ingoboka_api.v1.common.responses.ConsentResponse;
 import com.ingoboka_api.v1.common.responses.DependantResponse;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.common.util.HashUtils;
+import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.customer.models.CitizenProfile;
 import com.ingoboka_api.v1.customer.models.Consent;
 import com.ingoboka_api.v1.customer.models.Dependant;
@@ -20,9 +23,9 @@ import com.ingoboka_api.v1.customer.repositories.ConsentRepository;
 import com.ingoboka_api.v1.customer.repositories.DependantRepository;
 import com.ingoboka_api.v1.customer.services.CustomerProfileService;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -83,11 +86,11 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<DependantResponse> listMyDependants() {
+    public PageResponse<DependantResponse> listMyDependants(int page, int size) {
         CitizenProfile profile = requireMyProfile();
-        return dependantRepository.findByCitizenProfileIdOrderByCreatedAtAsc(profile.getId()).stream()
-                .map(this::toDependantResponse)
-                .toList();
+        Page<Dependant> result = dependantRepository.findByCitizenProfileIdOrderByCreatedAtDesc(
+                profile.getId(), PaginationUtils.toPageable(page, size));
+        return PageResponse.from(result.map(this::toDependantResponse));
     }
 
     @Override
@@ -151,12 +154,11 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ConsentResponse> listMyConsents() {
-        return consentRepository
-                .findByUserIdOrderByGrantedAtDesc(SecurityUtils.currentUser().getUserId())
-                .stream()
-                .map(this::toConsentResponse)
-                .toList();
+    public PageResponse<ConsentResponse> listMyConsents(int page, int size) {
+        Page<Consent> result = consentRepository.findByUserIdOrderByGrantedAtDesc(
+                SecurityUtils.currentUser().getUserId(),
+                PaginationUtils.toPageable(page, size, "grantedAt"));
+        return PageResponse.from(result.map(this::toConsentResponse));
     }
 
     @Override
@@ -251,5 +253,17 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
                 .grantedAt(consent.getGrantedAt())
                 .revokedAt(consent.getRevokedAt())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public CitizenProfileResponse reviewKyc(ReviewKycRequest request) {
+        CitizenProfile profile = citizenProfileRepository
+                .findById(request.getCitizenProfileId())
+                .orElseThrow(() -> new BusinessException("Citizen profile not found"));
+        profile.setKycStatus(request.getStatus());
+        profile.setUpdatedAt(Instant.now());
+        citizenProfileRepository.save(profile);
+        return toResponse(profile);
     }
 }

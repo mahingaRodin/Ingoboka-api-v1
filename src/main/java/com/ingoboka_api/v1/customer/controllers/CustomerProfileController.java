@@ -8,13 +8,13 @@ import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.CitizenProfileResponse;
 import com.ingoboka_api.v1.common.responses.ConsentResponse;
 import com.ingoboka_api.v1.common.responses.DependantResponse;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.customer.services.CustomerProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -26,11 +26,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/customers/me")
+@RequestMapping({"/api/customers/me", "/api/v1/customer/me", "/api/v1/customers/me"})
 @RequiredArgsConstructor
 @Tag(name = "Customer Profile & Consent", description = "Citizen profile, dependants, and legal consent management")
 @SecurityRequirement(name = "bearerAuth")
@@ -56,8 +57,9 @@ public class CustomerProfileController {
     @GetMapping("/dependants")
     @PreAuthorize("hasRole('CITIZEN')")
     @Operation(summary = "List my dependants")
-    public ApiResponse<List<DependantResponse>> listDependants() {
-        return ApiResponse.ok("Dependants retrieved", customerProfileService.listMyDependants());
+    public ApiResponse<PageResponse<DependantResponse>> listDependants(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Dependants retrieved", customerProfileService.listMyDependants(page, size));
     }
 
     @PostMapping("/dependants")
@@ -89,8 +91,9 @@ public class CustomerProfileController {
     @GetMapping("/consents")
     @PreAuthorize("hasRole('CITIZEN')")
     @Operation(summary = "List my consents")
-    public ApiResponse<List<ConsentResponse>> listConsents() {
-        return ApiResponse.ok("Consents retrieved", customerProfileService.listMyConsents());
+    public ApiResponse<PageResponse<ConsentResponse>> listConsents(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Consents retrieved", customerProfileService.listMyConsents(page, size));
     }
 
     @DeleteMapping("/consents/{consentType}")

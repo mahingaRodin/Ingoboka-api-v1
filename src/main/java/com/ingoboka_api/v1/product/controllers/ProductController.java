@@ -3,6 +3,7 @@ package com.ingoboka_api.v1.product.controllers;
 import com.ingoboka_api.v1.common.requests.CreateProductPlanRequest;
 import com.ingoboka_api.v1.common.requests.CreateProductRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.ProductPlanResponse;
 import com.ingoboka_api.v1.common.responses.ProductResponse;
 import com.ingoboka_api.v1.product.services.ProductCatalogService;
@@ -10,7 +11,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -50,15 +51,17 @@ public class ProductController {
     @GetMapping("/tenant")
     @PreAuthorize("hasAnyRole('INSURER_PRODUCT_MANAGER', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
     @Operation(summary = "List tenant products", description = "All products for the authenticated insurer tenant")
-    public ApiResponse<List<ProductResponse>> listTenantProducts() {
-        return ApiResponse.ok("Products retrieved", productCatalogService.listTenantProducts());
+    public ApiResponse<PageResponse<ProductResponse>> listTenantProducts(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Products retrieved", productCatalogService.listTenantProducts(page, size));
     }
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Browse published products", description = "Citizens and staff browse the public catalog")
-    public ApiResponse<List<ProductResponse>> listPublishedProducts() {
-        return ApiResponse.ok("Products retrieved", productCatalogService.listPublishedProducts());
+    public ApiResponse<PageResponse<ProductResponse>> listPublishedProducts(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Products retrieved", productCatalogService.listPublishedProducts(page, size));
     }
 
     @GetMapping("/{productId}")
@@ -88,8 +91,11 @@ public class ProductController {
     @GetMapping("/{productId}/plans")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "List plans for product")
-    public ApiResponse<List<ProductPlanResponse>> listPlans(@PathVariable UUID productId) {
-        return ApiResponse.ok("Plans retrieved", productCatalogService.listPlans(productId));
+    public ApiResponse<PageResponse<ProductPlanResponse>> listPlans(
+            @PathVariable UUID productId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Plans retrieved", productCatalogService.listPlans(productId, page, size));
     }
 
     @GetMapping("/{productId}/plans/{planId}")

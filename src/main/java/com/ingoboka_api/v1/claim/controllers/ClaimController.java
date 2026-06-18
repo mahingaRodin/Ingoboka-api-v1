@@ -10,11 +10,11 @@ import com.ingoboka_api.v1.common.requests.UpdateClaimStatusRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.ClaimAppealResponse;
 import com.ingoboka_api.v1.common.responses.ClaimResponse;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -56,16 +56,19 @@ public class ClaimController {
     @GetMapping("/me")
     @PreAuthorize("hasRole('CITIZEN')")
     @Operation(summary = "List my claims")
-    public ApiResponse<List<ClaimResponse>> listMyClaims() {
-        return ApiResponse.ok("Claims retrieved", claimService.listMyClaims());
+    public ApiResponse<PageResponse<ClaimResponse>> listMyClaims(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Claims retrieved", claimService.listMyClaims(page, size));
     }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
     @Operation(summary = "List tenant claims")
-    public ApiResponse<List<ClaimResponse>> listTenantClaims(
-            @RequestParam(required = false) ClaimStatus status) {
-        return ApiResponse.ok("Claims retrieved", claimService.listTenantClaims(status));
+    public ApiResponse<PageResponse<ClaimResponse>> listTenantClaims(
+            @RequestParam(required = false) ClaimStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Claims retrieved", claimService.listTenantClaims(status, page, size));
     }
 
     @GetMapping("/{claimId}")

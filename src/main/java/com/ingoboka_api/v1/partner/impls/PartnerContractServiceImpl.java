@@ -3,17 +3,19 @@ package com.ingoboka_api.v1.partner.impls;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.CreatePartnerContractRequest;
 import com.ingoboka_api.v1.common.requests.UpdateContractStatusRequest;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.PartnerContractResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
+import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.partner.models.PartnerContract;
 import com.ingoboka_api.v1.partner.repositories.PartnerContractRepository;
 import com.ingoboka_api.v1.partner.services.PartnerContractService;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,11 +52,11 @@ public class PartnerContractServiceImpl implements PartnerContractService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PartnerContractResponse> listContracts(UUID partnerId) {
+    public PageResponse<PartnerContractResponse> listContracts(UUID partnerId, int page, int size) {
         assertCanViewContracts(partnerId);
-        return partnerContractRepository.findByOrganizationIdOrderByCreatedAtDesc(partnerId).stream()
-                .map(this::toResponse)
-                .toList();
+        Page<PartnerContract> result = partnerContractRepository.findByOrganizationIdOrderByCreatedAtDesc(
+                partnerId, PaginationUtils.toPageable(page, size));
+        return PageResponse.from(result.map(this::toResponse));
     }
 
     @Override

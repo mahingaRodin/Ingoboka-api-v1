@@ -5,11 +5,15 @@ import com.ingoboka_api.v1.customer.models.Consent;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ConsentRepository extends JpaRepository<Consent, UUID> {
 
     List<Consent> findByUserIdOrderByGrantedAtDesc(UUID userId);
+
+    Page<Consent> findByUserIdOrderByGrantedAtDesc(UUID userId, Pageable pageable);
 
     Optional<Consent> findByIdAndUserId(UUID id, UUID userId);
 

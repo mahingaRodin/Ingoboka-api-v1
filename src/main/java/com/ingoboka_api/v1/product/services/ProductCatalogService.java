@@ -2,10 +2,10 @@ package com.ingoboka_api.v1.product.services;
 
 import com.ingoboka_api.v1.common.requests.CreateProductPlanRequest;
 import com.ingoboka_api.v1.common.requests.CreateProductRequest;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.ProductPlanResponse;
 import com.ingoboka_api.v1.common.responses.ProductResponse;
 import com.ingoboka_api.v1.product.models.ProductPlan;
-import java.util.List;
 import java.util.UUID;
 
 public interface ProductCatalogService {
@@ -14,9 +14,9 @@ public interface ProductCatalogService {
 
     ProductResponse publishProduct(UUID productId);
 
-    List<ProductResponse> listTenantProducts();
+    PageResponse<ProductResponse> listTenantProducts(int page, int size);
 
-    List<ProductResponse> listPublishedProducts();
+    PageResponse<ProductResponse> listPublishedProducts(int page, int size);
 
     ProductResponse getProduct(UUID productId);
 
@@ -24,7 +24,7 @@ public interface ProductCatalogService {
 
     ProductPlanResponse publishPlan(UUID productId, UUID planId);
 
-    List<ProductPlanResponse> listPlans(UUID productId);
+    PageResponse<ProductPlanResponse> listPlans(UUID productId, int page, int size);
 
     ProductPlanResponse getPlan(UUID planId);
 

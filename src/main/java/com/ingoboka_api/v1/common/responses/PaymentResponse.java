@@ -17,6 +17,9 @@ public class PaymentResponse {
     PaymentStatus status;
     String provider;
     String providerReference;
+    String externalTransactionId;
+    String payerPhone;
+    String paymentInstructions;
     Instant initiatedAt;
     Instant completedAt;
 }

@@ -6,6 +6,7 @@ import com.ingoboka_api.v1.common.requests.OnboardPartnerRequest;
 import com.ingoboka_api.v1.common.requests.UpdatePartnerRequest;
 import com.ingoboka_api.v1.common.requests.UpdatePartnerStatusRequest;
 import com.ingoboka_api.v1.common.responses.OnboardPartnerResponse;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.PartnerResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
@@ -17,9 +18,9 @@ import com.ingoboka_api.v1.partner.models.PartnerProfile;
 import com.ingoboka_api.v1.partner.repositories.PartnerProfileRepository;
 import com.ingoboka_api.v1.partner.services.PartnerService;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,10 +61,10 @@ public class PartnerServiceImpl implements PartnerService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PartnerResponse> listPartners() {
-        return organizationManagementService.listTenantOrganizations().stream()
-                .map(this::toResponseWithProfile)
-                .toList();
+    public PageResponse<PartnerResponse> listPartners(int page, int size) {
+        Page<Organization> result =
+                organizationManagementService.listTenantOrganizations(page, size);
+        return PageResponse.from(result.map(this::toResponseWithProfile));
     }
 
     @Override

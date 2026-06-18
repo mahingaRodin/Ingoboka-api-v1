@@ -3,13 +3,13 @@ package com.ingoboka_api.v1.partner.controllers;
 import com.ingoboka_api.v1.common.requests.CreatePartnerContractRequest;
 import com.ingoboka_api.v1.common.requests.UpdateContractStatusRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.PartnerContractResponse;
 import com.ingoboka_api.v1.partner.services.PartnerContractService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -44,8 +45,11 @@ public class PartnerContractController {
     @GetMapping
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'PARTNER_ADMIN')")
     @Operation(summary = "List contracts", description = "View contracts for a partner tenant")
-    public ApiResponse<List<PartnerContractResponse>> listContracts(@PathVariable UUID partnerId) {
-        return ApiResponse.ok("Contracts retrieved", partnerContractService.listContracts(partnerId));
+    public ApiResponse<PageResponse<PartnerContractResponse>> listContracts(
+            @PathVariable UUID partnerId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Contracts retrieved", partnerContractService.listContracts(partnerId, page, size));
     }
 
     @PatchMapping("/{contractId}/status")

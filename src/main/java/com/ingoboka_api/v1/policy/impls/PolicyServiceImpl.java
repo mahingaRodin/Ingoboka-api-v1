@@ -6,10 +6,13 @@ import com.ingoboka_api.v1.common.enums.PolicyStatus;
 import com.ingoboka_api.v1.common.enums.PremiumScheduleStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.AttachPolicyDocumentRequest;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.PolicyResponse;
 import com.ingoboka_api.v1.common.responses.PolicyVerificationResponse;
+import com.ingoboka_api.v1.common.responses.PremiumScheduleResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
+import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.customer.models.CitizenProfile;
 import com.ingoboka_api.v1.customer.models.Dependant;
 import com.ingoboka_api.v1.customer.repositories.CitizenProfileRepository;
@@ -22,6 +25,7 @@ import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.identity.services.OrganizationManagementService;
 import com.ingoboka_api.v1.billing.models.PremiumSchedule;
 import com.ingoboka_api.v1.billing.repositories.PremiumScheduleRepository;
+import com.ingoboka_api.v1.billing.services.BillingFinanceService;
 import com.ingoboka_api.v1.policy.models.Policy;
 import com.ingoboka_api.v1.policy.models.PolicyDocument;
 import com.ingoboka_api.v1.policy.models.PolicyMember;
@@ -35,6 +39,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +55,7 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
     private final DependantRepository dependantRepository;
     private final UserRepository userRepository;
     private final OrganizationManagementService organizationManagementService;
+    private final BillingFinanceService billingFinanceService;
 
     @Override
     @Transactional
@@ -108,20 +114,20 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PolicyResponse> listMyPolicies() {
+    public PageResponse<PolicyResponse> listMyPolicies(int page, int size) {
         CitizenProfile profile = requireMyProfile();
-        return policyRepository.findByCitizenProfileIdOrderByCreatedAtDesc(profile.getId()).stream()
-                .map(this::toResponse)
-                .toList();
+        Page<Policy> result = policyRepository.findByCitizenProfileIdOrderByCreatedAtDesc(
+                profile.getId(), PaginationUtils.toPageable(page, size));
+        return PageResponse.from(result.map(this::toResponse));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<PolicyResponse> listTenantPolicies() {
+    public PageResponse<PolicyResponse> listTenantPolicies(int page, int size) {
         UUID orgId = requireTenantOrganizationId();
-        return policyRepository.findByOrganizationIdOrderByCreatedAtDesc(orgId).stream()
-                .map(this::toResponse)
-                .toList();
+        Page<Policy> result = policyRepository.findByOrganizationIdOrderByCreatedAtDesc(
+                orgId, PaginationUtils.toPageable(page, size));
+        return PageResponse.from(result.map(this::toResponse));
     }
 
     @Override
@@ -188,6 +194,40 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
         return policy;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<PremiumScheduleResponse> listPremiumSchedules(UUID policyId, int page, int size) {
+        Policy policy = policyRepository
+                .findById(policyId)
+                .orElseThrow(() -> new BusinessException("Policy not found"));
+        assertCanAccessPolicy(policy);
+        var schedules = premiumScheduleRepository.findByPolicyIdOrderByDueDateAsc(policyId);
+        int from = Math.min(page * size, schedules.size());
+        int to = Math.min(from + size, schedules.size());
+        var slice = schedules.subList(from, to).stream().map(this::toScheduleResponse).toList();
+        return PageResponse.<PremiumScheduleResponse>builder()
+                .content(slice)
+                .page(page)
+                .size(size)
+                .totalElements(schedules.size())
+                .totalPages(size == 0 ? 0 : (int) Math.ceil((double) schedules.size() / size))
+                .first(page == 0)
+                .last(to >= schedules.size())
+                .build();
+    }
+
+    private PremiumScheduleResponse toScheduleResponse(PremiumSchedule schedule) {
+        return PremiumScheduleResponse.builder()
+                .id(schedule.getId())
+                .policyId(schedule.getPolicyId())
+                .dueDate(schedule.getDueDate())
+                .amount(schedule.getAmount())
+                .status(schedule.getStatus())
+                .paidAt(schedule.getPaidAt())
+                .paymentId(schedule.getPaymentId())
+                .build();
+    }
+
     private void addPolicyMembers(Policy policy, Instant now) {
         CitizenProfile profile = citizenProfileRepository
                 .findById(policy.getCitizenProfileId())
@@ -227,6 +267,7 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
         schedule.setStatus(PremiumScheduleStatus.PENDING);
         schedule.setCreatedAt(now);
         premiumScheduleRepository.save(schedule);
+        billingFinanceService.issueBillForSchedule(schedule, policy.getOrganizationId(), policy.getId());
     }
 
     private PolicyResponse toResponse(Policy policy) {

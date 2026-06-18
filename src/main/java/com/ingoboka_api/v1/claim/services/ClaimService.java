@@ -8,7 +8,7 @@ import com.ingoboka_api.v1.common.requests.RecordClaimDecisionRequest;
 import com.ingoboka_api.v1.common.requests.UpdateClaimStatusRequest;
 import com.ingoboka_api.v1.common.responses.ClaimAppealResponse;
 import com.ingoboka_api.v1.common.responses.ClaimResponse;
-import java.util.List;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import java.util.UUID;
 
 public interface ClaimService {
@@ -19,9 +19,9 @@ public interface ClaimService {
 
     ClaimResponse getClaim(UUID claimId);
 
-    List<ClaimResponse> listMyClaims();
+    PageResponse<ClaimResponse> listMyClaims(int page, int size);
 
-    List<ClaimResponse> listTenantClaims(ClaimStatus status);
+    PageResponse<ClaimResponse> listTenantClaims(ClaimStatus status, int page, int size);
 
     ClaimResponse updateStatus(UUID claimId, UpdateClaimStatusRequest request);
 

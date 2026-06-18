@@ -5,10 +5,12 @@ import com.ingoboka_api.v1.common.enums.ProductStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.CreateProductPlanRequest;
 import com.ingoboka_api.v1.common.requests.CreateProductRequest;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.ProductPlanResponse;
 import com.ingoboka_api.v1.common.responses.ProductResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
+import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.identity.models.Organization;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.identity.services.OrganizationManagementService;
@@ -24,9 +26,9 @@ import com.ingoboka_api.v1.product.repositories.ProductExclusionRepository;
 import com.ingoboka_api.v1.product.repositories.ProductPlanRepository;
 import com.ingoboka_api.v1.product.services.ProductCatalogService;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,19 +81,19 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ProductResponse> listTenantProducts() {
+    public PageResponse<ProductResponse> listTenantProducts(int page, int size) {
         UUID orgId = requireInsurerOrganizationId();
-        return productRepository.findByOrganizationIdOrderByCreatedAtDesc(orgId).stream()
-                .map(this::toProductResponse)
-                .toList();
+        Page<InsuranceProduct> result = productRepository.findByOrganizationIdOrderByCreatedAtDesc(
+                orgId, PaginationUtils.toPageable(page, size));
+        return PageResponse.from(result.map(this::toProductResponse));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ProductResponse> listPublishedProducts() {
-        return productRepository.findByStatusOrderByPublishedAtDesc(ProductStatus.PUBLISHED).stream()
-                .map(this::toProductResponse)
-                .toList();
+    public PageResponse<ProductResponse> listPublishedProducts(int page, int size) {
+        Page<InsuranceProduct> result = productRepository.findByStatusOrderByPublishedAtDesc(
+                ProductStatus.PUBLISHED, PaginationUtils.toPageable(page, size, "publishedAt"));
+        return PageResponse.from(result.map(this::toProductResponse));
     }
 
     @Override
@@ -155,15 +157,17 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ProductPlanResponse> listPlans(UUID productId) {
+    public PageResponse<ProductPlanResponse> listPlans(UUID productId, int page, int size) {
         InsuranceProduct product = productRepository
                 .findById(productId)
                 .orElseThrow(() -> new BusinessException("Product not found"));
         boolean manager = canManageProducts(product.getOrganizationId());
-        return planRepository.findByProductIdOrderByCreatedAtAsc(productId).stream()
-                .filter(plan -> manager || plan.getStatus() == ProductStatus.PUBLISHED)
-                .map(plan -> buildPlanResponse(plan, true))
-                .toList();
+        Page<ProductPlan> result = manager
+                ? planRepository.findByProductIdOrderByCreatedAtDesc(
+                        productId, PaginationUtils.toPageable(page, size))
+                : planRepository.findByProductIdAndStatusOrderByCreatedAtDesc(
+                        productId, ProductStatus.PUBLISHED, PaginationUtils.toPageable(page, size));
+        return PageResponse.from(result.map(plan -> buildPlanResponse(plan, true)));
     }
 
     @Override

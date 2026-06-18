@@ -5,11 +5,18 @@ import com.ingoboka_api.v1.product.models.ProductPlan;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ProductPlanRepository extends JpaRepository<ProductPlan, UUID> {
 
     List<ProductPlan> findByProductIdOrderByCreatedAtAsc(UUID productId);
+
+    Page<ProductPlan> findByProductIdOrderByCreatedAtDesc(UUID productId, Pageable pageable);
+
+    Page<ProductPlan> findByProductIdAndStatusOrderByCreatedAtDesc(
+            UUID productId, ProductStatus status, Pageable pageable);
 
     Optional<ProductPlan> findByIdAndProductId(UUID id, UUID productId);
 

@@ -6,8 +6,11 @@ import com.ingoboka_api.v1.common.responses.AuthTokensResponse;
 import com.ingoboka_api.v1.common.requests.EmailRequest;
 import com.ingoboka_api.v1.common.requests.LoginRequest;
 import com.ingoboka_api.v1.common.requests.PasswordResetRequest;
+import com.ingoboka_api.v1.common.requests.RefreshTokenRequest;
+import com.ingoboka_api.v1.common.requests.ResendOtpRequest;
 import com.ingoboka_api.v1.common.requests.SignupRequest;
 import com.ingoboka_api.v1.common.requests.VerifyEmailConfirmRequest;
+import com.ingoboka_api.v1.common.requests.VerifyOtpRequest;
 import com.ingoboka_api.v1.identity.services.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,7 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping({"/api/auth", "/api/v1/auth"})
 @RequiredArgsConstructor
 @Tag(name = "Authentication", description = "Identity and access endpoints")
 public class AuthController {
@@ -77,5 +80,25 @@ public class AuthController {
     public ApiResponse<Void> activateAccount(@Valid @RequestBody ActivateAccountRequest request) {
         authService.activateAccount(request);
         return ApiResponse.ok("Account activated successfully.", null);
+    }
+
+    @PostMapping("/verify-otp")
+    @Operation(summary = "Verify signup OTP", description = "Activates citizen account after phone OTP verification")
+    public ApiResponse<Void> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        authService.verifyOtp(request);
+        return ApiResponse.ok("Account verified successfully.", null);
+    }
+
+    @PostMapping("/resend-otp")
+    @Operation(summary = "Resend signup OTP", description = "Resends OTP to email for testing; SMS gateway later")
+    public ApiResponse<Void> resendOtp(@Valid @RequestBody ResendOtpRequest request) {
+        authService.resendOtp(request);
+        return ApiResponse.ok("If the account exists, a new OTP has been sent.", null);
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh access token", description = "Exchange a valid refresh token for new tokens")
+    public ApiResponse<AuthTokensResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return ApiResponse.ok("Token refreshed", authService.refresh(request));
     }
 }

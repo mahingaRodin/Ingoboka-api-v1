@@ -7,9 +7,11 @@ import com.ingoboka_api.v1.common.requests.GenerateQuoteRequest;
 import com.ingoboka_api.v1.common.requests.ReviewApplicationRequest;
 import com.ingoboka_api.v1.common.requests.SubmitApplicationRequest;
 import com.ingoboka_api.v1.common.responses.ApplicationResponse;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.QuoteResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
+import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.customer.models.CitizenProfile;
 import com.ingoboka_api.v1.customer.models.Consent;
 import com.ingoboka_api.v1.customer.services.CustomerProfileService;
@@ -39,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -141,12 +144,13 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ApplicationResponse> listMyApplications() {
+    public PageResponse<ApplicationResponse> listMyApplications(int page, int size) {
         CitizenProfile profile =
                 customerProfileService.requireProfileForUser(SecurityUtils.currentUser().getUserId());
-        return applicationRepository.findByCitizenProfileIdOrderBySubmittedAtDesc(profile.getId()).stream()
-                .map(app -> toApplicationResponse(app, loadAnswers(app.getId())))
-                .toList();
+        Page<PolicyApplication> result = applicationRepository.findByCitizenProfileIdOrderBySubmittedAtDesc(
+                profile.getId(), PaginationUtils.toPageable(page, size, "submittedAt"));
+        return PageResponse.from(result.map(
+                app -> toApplicationResponse(app, loadAnswers(app.getId()))));
     }
 
     @Override
@@ -161,14 +165,16 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ApplicationResponse> listTenantApplications(ApplicationStatus status) {
+    public PageResponse<ApplicationResponse> listTenantApplications(
+            ApplicationStatus status, int page, int size) {
         UUID orgId = requireUnderwriterOrganizationId();
-        List<PolicyApplication> applications = status == null
-                ? applicationRepository.findByOrganizationIdOrderBySubmittedAtDesc(orgId)
-                : applicationRepository.findByOrganizationIdAndStatusOrderBySubmittedAtDesc(orgId, status);
-        return applications.stream()
-                .map(app -> toApplicationResponse(app, loadAnswers(app.getId())))
-                .toList();
+        Page<PolicyApplication> result = status == null
+                ? applicationRepository.findByOrganizationIdOrderBySubmittedAtDesc(
+                        orgId, PaginationUtils.toPageable(page, size, "submittedAt"))
+                : applicationRepository.findByOrganizationIdAndStatusOrderBySubmittedAtDesc(
+                        orgId, status, PaginationUtils.toPageable(page, size, "submittedAt"));
+        return PageResponse.from(result.map(
+                app -> toApplicationResponse(app, loadAnswers(app.getId()))));
     }
 
     @Override

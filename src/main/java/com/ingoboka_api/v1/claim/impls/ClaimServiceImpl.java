@@ -1,5 +1,6 @@
 package com.ingoboka_api.v1.claim.impls;
 
+import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import com.ingoboka_api.v1.claim.models.Claim;
 import com.ingoboka_api.v1.claim.models.ClaimAppeal;
 import com.ingoboka_api.v1.claim.models.ClaimDecision;
@@ -15,6 +16,7 @@ import com.ingoboka_api.v1.common.enums.AppealStatus;
 import com.ingoboka_api.v1.common.enums.ClaimDecisionType;
 import com.ingoboka_api.v1.common.enums.ClaimStatus;
 import com.ingoboka_api.v1.common.enums.DocumentAccessClassification;
+import com.ingoboka_api.v1.common.enums.NotificationChannel;
 import com.ingoboka_api.v1.common.enums.PolicyStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.AttachClaimDocumentRequest;
@@ -24,18 +26,24 @@ import com.ingoboka_api.v1.common.requests.RecordClaimDecisionRequest;
 import com.ingoboka_api.v1.common.requests.UpdateClaimStatusRequest;
 import com.ingoboka_api.v1.common.responses.ClaimAppealResponse;
 import com.ingoboka_api.v1.common.responses.ClaimResponse;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
+import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.customer.models.CitizenProfile;
 import com.ingoboka_api.v1.customer.repositories.CitizenProfileRepository;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
+import com.ingoboka_api.v1.identity.repositories.UserRepository;
+import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
 import com.ingoboka_api.v1.policy.models.Policy;
 import com.ingoboka_api.v1.policy.repositories.PolicyRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +60,9 @@ public class ClaimServiceImpl implements ClaimService {
     private final ClaimAppealRepository claimAppealRepository;
     private final PolicyRepository policyRepository;
     private final CitizenProfileRepository citizenProfileRepository;
+    private final NotificationTemplateService notificationTemplateService;
+    private final AuditComplianceService auditComplianceService;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
@@ -86,6 +97,11 @@ public class ClaimServiceImpl implements ClaimService {
         transitionStatus(claim, ClaimStatus.SUBMITTED, "Claim submitted by policyholder", null);
         claim.setUpdatedAt(Instant.now());
         claimRepository.save(claim);
+        notifyClaimholder(claim, "CLAIM_SUBMITTED", Map.of(
+                "claimNumber", claim.getClaimNumber(),
+                "decision", "SUBMITTED",
+                "notes", "Your claim is now under review."));
+        auditComplianceService.log("CLAIM_SUBMITTED", "CLAIM", claim.getId(), "Claim submitted");
         return toResponse(claim);
     }
 
@@ -101,21 +117,23 @@ public class ClaimServiceImpl implements ClaimService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ClaimResponse> listMyClaims() {
+    public PageResponse<ClaimResponse> listMyClaims(int page, int size) {
         CitizenProfile profile = requireMyProfile();
-        return claimRepository.findByCitizenProfileIdOrderByCreatedAtDesc(profile.getId()).stream()
-                .map(this::toResponse)
-                .toList();
+        Page<Claim> result = claimRepository.findByCitizenProfileIdOrderByCreatedAtDesc(
+                profile.getId(), PaginationUtils.toPageable(page, size));
+        return PageResponse.from(result.map(this::toResponse));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ClaimResponse> listTenantClaims(ClaimStatus status) {
+    public PageResponse<ClaimResponse> listTenantClaims(ClaimStatus status, int page, int size) {
         UUID orgId = requireClaimsOrganizationId();
-        List<Claim> claims = status == null
-                ? claimRepository.findByOrganizationIdOrderByCreatedAtDesc(orgId)
-                : claimRepository.findByOrganizationIdAndStatusOrderByCreatedAtDesc(orgId, status);
-        return claims.stream().map(this::toResponse).toList();
+        Page<Claim> result = status == null
+                ? claimRepository.findByOrganizationIdOrderByCreatedAtDesc(
+                        orgId, PaginationUtils.toPageable(page, size))
+                : claimRepository.findByOrganizationIdAndStatusOrderByCreatedAtDesc(
+                        orgId, status, PaginationUtils.toPageable(page, size));
+        return PageResponse.from(result.map(this::toResponse));
     }
 
     @Override
@@ -171,6 +189,18 @@ public class ClaimServiceImpl implements ClaimService {
         transitionStatus(claim, targetStatus, request.getReason(), actorId);
         claim.setUpdatedAt(Instant.now());
         claimRepository.save(claim);
+
+        String decisionLabel = formatDecision(request.getDecision(), request.getApprovedAmount());
+        notifyClaimholder(claim, "CLAIM_DECISION", Map.of(
+                "claimNumber", claim.getClaimNumber(),
+                "decision", decisionLabel,
+                "notes", request.getReason() != null ? request.getReason() : ""));
+        auditComplianceService.log(
+                "CLAIM_DECISION_RECORDED",
+                "CLAIM",
+                claim.getId(),
+                request.getDecision() + ": " + decisionLabel);
+
         return toResponse(claim);
     }
 
@@ -309,6 +339,28 @@ public class ClaimServiceImpl implements ClaimService {
 
     private String generateClaimNumber() {
         return "CLM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    private String formatDecision(ClaimDecisionType decision, java.math.BigDecimal approvedAmount) {
+        return switch (decision) {
+            case APPROVED -> "APPROVED"
+                    + (approvedAmount != null ? " (RWF " + approvedAmount + ")" : "");
+            case REJECTED -> "REJECTED";
+            case PARTIAL -> "PARTIALLY APPROVED"
+                    + (approvedAmount != null ? " (RWF " + approvedAmount + ")" : "");
+        };
+    }
+
+    private void notifyClaimholder(Claim claim, String templateCode, Map<String, String> variables) {
+        citizenProfileRepository.findById(claim.getCitizenProfileId()).ifPresent(profile -> userRepository
+                .findById(profile.getUserId())
+                .ifPresent(user -> notificationTemplateService.sendTemplated(
+                        user.getId(),
+                        claim.getOrganizationId(),
+                        templateCode,
+                        NotificationChannel.EMAIL,
+                        user.getEmail(),
+                        variables)));
     }
 
     private ClaimResponse toResponse(Claim claim) {

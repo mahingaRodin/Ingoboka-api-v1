@@ -4,10 +4,12 @@ import com.ingoboka_api.v1.common.enums.UserStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.CreateStaffRequest;
 import com.ingoboka_api.v1.common.requests.UpdateStaffStatusRequest;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.StaffCreatedResponse;
 import com.ingoboka_api.v1.common.responses.StaffResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
+import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.identity.models.Role;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.identity.models.User;
@@ -15,11 +17,11 @@ import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.identity.services.StaffProvisioningService;
 import com.ingoboka_api.v1.partner.services.PartnerStaffService;
 import java.time.Instant;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,11 +57,11 @@ public class PartnerStaffServiceImpl implements PartnerStaffService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<StaffResponse> listStaff(UUID partnerId) {
+    public PageResponse<StaffResponse> listStaff(UUID partnerId, int page, int size) {
         assertCanManageStaff(partnerId);
-        return userRepository.findByOrganizationIdOrderByCreatedAtDesc(partnerId).stream()
-                .map(this::toResponse)
-                .toList();
+        Page<User> result = userRepository.findByOrganizationIdOrderByCreatedAtDesc(
+                partnerId, PaginationUtils.toPageable(page, size));
+        return PageResponse.from(result.map(this::toResponse));
     }
 
     @Override

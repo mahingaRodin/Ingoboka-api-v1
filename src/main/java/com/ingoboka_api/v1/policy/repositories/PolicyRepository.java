@@ -5,6 +5,9 @@ import com.ingoboka_api.v1.policy.models.Policy;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.LocalDate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PolicyRepository extends JpaRepository<Policy, UUID> {
@@ -15,7 +18,17 @@ public interface PolicyRepository extends JpaRepository<Policy, UUID> {
 
     List<Policy> findByCitizenProfileIdOrderByCreatedAtDesc(UUID citizenProfileId);
 
+    Page<Policy> findByCitizenProfileIdOrderByCreatedAtDesc(UUID citizenProfileId, Pageable pageable);
+
     List<Policy> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
+    Page<Policy> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId, Pageable pageable);
+
     boolean existsByApplicationId(UUID applicationId);
+
+    long countByOrganizationIdAndStatus(UUID organizationId, PolicyStatus status);
+
+    List<Policy> findByStatus(PolicyStatus status);
+
+    List<Policy> findByStatusAndEndDateBefore(PolicyStatus status, LocalDate date);
 }

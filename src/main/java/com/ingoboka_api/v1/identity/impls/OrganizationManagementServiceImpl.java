@@ -6,11 +6,13 @@ import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.identity.models.Organization;
 import com.ingoboka_api.v1.identity.repositories.OrganizationRepository;
 import com.ingoboka_api.v1.identity.services.OrganizationManagementService;
+import com.ingoboka_api.v1.common.util.PaginationUtils;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,9 +52,10 @@ public class OrganizationManagementServiceImpl implements OrganizationManagement
 
     @Override
     @Transactional(readOnly = true)
-    public List<Organization> listTenantOrganizations() {
+    public Page<Organization> listTenantOrganizations(int page, int size) {
         return organizationRepository.findByTypeInOrderByCreatedAtDesc(
-                List.of(OrganizationType.INSURER, OrganizationType.PARTNER));
+                List.of(OrganizationType.INSURER, OrganizationType.PARTNER),
+                PaginationUtils.toPageable(page, size));
     }
 
     @Override

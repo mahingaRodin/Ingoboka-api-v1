@@ -57,6 +57,12 @@ public class Policy {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    @Column(name = "grace_period_end")
+    private LocalDate gracePeriodEnd;
+
+    @Column(name = "renewed_from_policy_id")
+    private UUID renewedFromPolicyId;
+
     @Column(name = "qr_verification_token", nullable = false, unique = true, length = 128)
     private String qrVerificationToken;
 

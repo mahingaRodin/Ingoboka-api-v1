@@ -5,13 +5,13 @@ import com.ingoboka_api.v1.common.requests.UpdatePartnerRequest;
 import com.ingoboka_api.v1.common.requests.UpdatePartnerStatusRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.OnboardPartnerResponse;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.PartnerResponse;
 import com.ingoboka_api.v1.partner.services.PartnerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -45,8 +46,9 @@ public class PartnerController {
     @GetMapping
     @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     @Operation(summary = "List partners", description = "List all insurer and partner tenants")
-    public ApiResponse<List<PartnerResponse>> listPartners() {
-        return ApiResponse.ok("Partners retrieved", partnerService.listPartners());
+    public ApiResponse<PageResponse<PartnerResponse>> listPartners(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Partners retrieved", partnerService.listPartners(page, size));
     }
 
     @GetMapping("/me")

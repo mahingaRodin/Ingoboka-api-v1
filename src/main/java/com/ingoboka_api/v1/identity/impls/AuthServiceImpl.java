@@ -2,6 +2,7 @@ package com.ingoboka_api.v1.identity.impls;
 
 import com.ingoboka_api.v1.common.config.JwtProperties;
 import com.ingoboka_api.v1.common.config.SecurityProperties;
+import com.ingoboka_api.v1.common.enums.NotificationChannel;
 import com.ingoboka_api.v1.common.enums.UserStatus;
 import com.ingoboka_api.v1.common.enums.VerificationTokenType;
 import com.ingoboka_api.v1.common.exception.BusinessException;
@@ -16,7 +17,11 @@ import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.identity.repositories.VerificationTokenRepository;
 import com.ingoboka_api.v1.identity.services.AuthService;
 import com.ingoboka_api.v1.identity.services.NotificationService;
+import com.ingoboka_api.v1.identity.services.OtpService;
+import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -44,6 +49,13 @@ public class AuthServiceImpl implements AuthService {
     private final JwtProperties jwtProperties;
     private final SecurityProperties securityProperties;
     private final NotificationService notificationService;
+    private final OtpService otpService;
+    private final NotificationTemplateService notificationTemplateService;
+
+    private static final String OTP_PURPOSE_SIGNUP = "SIGNUP";
+
+    @Value("${ingoboka.security.otp.expiration-minutes:10}")
+    private int otpExpirationMinutes;
 
     @Override
     @Transactional
@@ -69,12 +81,24 @@ public class AuthServiceImpl implements AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setStatus(UserStatus.PENDING_EMAIL_VERIFICATION);
         user.setEmailVerified(false);
+        user.setPhoneVerified(false);
         user.setCreatedAt(now);
         user.setUpdatedAt(now);
         user.getRoles().add(citizenRole);
 
         userRepository.save(user);
-        issueVerificationToken(user, VerificationTokenType.EMAIL_VERIFICATION);
+        sendSignupOtp(user);
+    }
+
+    private void sendSignupOtp(User user) {
+        String otp = otpService.generateAndStore(OTP_PURPOSE_SIGNUP, user.getPhoneNumber());
+        notificationTemplateService.sendTemplated(
+                user.getId(),
+                null,
+                "OTP_VERIFICATION",
+                NotificationChannel.EMAIL,
+                user.getEmail(),
+                Map.of("otp", otp, "minutes", String.valueOf(otpExpirationMinutes)));
     }
 
     @Override
@@ -87,8 +111,8 @@ public class AuthServiceImpl implements AuthService {
                 .findByEmailIgnoreCase(request.getEmail())
                 .orElseThrow(() -> new BusinessException("Invalid credentials"));
 
-        if (user.getStatus() == UserStatus.PENDING_EMAIL_VERIFICATION) {
-            throw new BusinessException("Please verify your email before logging in");
+        if (user.getStatus() == UserStatus.PENDING_EMAIL_VERIFICATION || !user.isPhoneVerified()) {
+            throw new BusinessException("Please verify your account with OTP before logging in");
         }
         if (user.getStatus() == UserStatus.PENDING_ACTIVATION) {
             throw new BusinessException("Please activate your account before logging in");
@@ -120,6 +144,44 @@ public class AuthServiceImpl implements AuthService {
         user.setUpdatedAt(Instant.now());
         consumeToken(token);
         userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void verifyOtp(VerifyOtpRequest request) {
+        otpService.verify(OTP_PURPOSE_SIGNUP, request.getPhoneNumber(), request.getOtp());
+        User user = userRepository
+                .findByPhoneNumber(request.getPhoneNumber())
+                .orElseThrow(() -> new BusinessException("Account not found"));
+        user.setPhoneVerified(true);
+        user.setEmailVerified(true);
+        user.setStatus(UserStatus.ACTIVE);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void resendOtp(ResendOtpRequest request) {
+        userRepository.findByPhoneNumber(request.getPhoneNumber()).ifPresent(user -> {
+            if (user.getStatus() == UserStatus.PENDING_EMAIL_VERIFICATION) {
+                sendSignupOtp(user);
+            }
+        });
+    }
+
+    @Override
+    @Transactional
+    public AuthTokensResponse refresh(RefreshTokenRequest request) {
+        RefreshToken stored = refreshTokenRepository
+                .findByTokenHashAndRevokedFalse(hashToken(request.getRefreshToken()))
+                .orElseThrow(() -> new BusinessException("Invalid refresh token"));
+        if (stored.getExpiresAt().isBefore(Instant.now())) {
+            throw new BusinessException("Refresh token expired");
+        }
+        stored.setRevoked(true);
+        refreshTokenRepository.save(stored);
+        return buildAuthResponse(stored.getUser());
     }
 
     @Override

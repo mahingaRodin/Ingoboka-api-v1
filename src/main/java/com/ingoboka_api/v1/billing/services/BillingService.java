@@ -1,9 +1,10 @@
 package com.ingoboka_api.v1.billing.services;
 
 import com.ingoboka_api.v1.common.requests.InitiatePaymentRequest;
+import com.ingoboka_api.v1.common.requests.MomoPaymentWebhookRequest;
 import com.ingoboka_api.v1.common.requests.PaymentWebhookRequest;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.PaymentResponse;
-import java.util.List;
 import java.util.UUID;
 
 public interface BillingService {
@@ -12,7 +13,9 @@ public interface BillingService {
 
     PaymentResponse processWebhook(String provider, PaymentWebhookRequest request);
 
-    List<PaymentResponse> listMyPayments();
+    PaymentResponse processMomoWebhook(MomoPaymentWebhookRequest request);
 
-    List<PaymentResponse> listPolicyPayments(UUID policyId);
+    PageResponse<PaymentResponse> listMyPayments(int page, int size);
+
+    PageResponse<PaymentResponse> listPolicyPayments(UUID policyId, int page, int size);
 }

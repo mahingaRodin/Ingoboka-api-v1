@@ -6,13 +6,13 @@ import com.ingoboka_api.v1.common.requests.ReviewApplicationRequest;
 import com.ingoboka_api.v1.common.requests.SubmitApplicationRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.ApplicationResponse;
+import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.QuoteResponse;
 import com.ingoboka_api.v1.enrollment.services.EnrollmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -55,8 +55,9 @@ public class EnrollmentController {
     @GetMapping("/me")
     @PreAuthorize("hasRole('CITIZEN')")
     @Operation(summary = "List my applications")
-    public ApiResponse<List<ApplicationResponse>> listMyApplications() {
-        return ApiResponse.ok("Applications retrieved", enrollmentService.listMyApplications());
+    public ApiResponse<PageResponse<ApplicationResponse>> listMyApplications(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Applications retrieved", enrollmentService.listMyApplications(page, size));
     }
 
     @GetMapping("/{applicationId}")
@@ -69,9 +70,12 @@ public class EnrollmentController {
     @GetMapping
     @PreAuthorize("hasAnyRole('UNDERWRITER', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
     @Operation(summary = "List tenant applications", description = "Underwriter work queue for the insurer tenant")
-    public ApiResponse<List<ApplicationResponse>> listTenantApplications(
-            @RequestParam(required = false) ApplicationStatus status) {
-        return ApiResponse.ok("Applications retrieved", enrollmentService.listTenantApplications(status));
+    public ApiResponse<PageResponse<ApplicationResponse>> listTenantApplications(
+            @RequestParam(required = false) ApplicationStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok(
+                "Applications retrieved", enrollmentService.listTenantApplications(status, page, size));
     }
 
     @PatchMapping("/{applicationId}/review")
