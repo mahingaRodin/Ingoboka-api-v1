@@ -4,6 +4,6 @@ VALUES (
     'PAYMENT',
     'MTN MoMo Sandbox Payment',
     TRUE,
-    '{"mode":"sandbox","provider":"momo","currency":"RWF","callbackPath":"/api/v1/payments/webhooks/momo"}'
+    '{"mode":"sandbox","provider":"momo","currency":"RWF","callbackPath":"/api/payments/webhooks/momo"}'
 )
 ON CONFLICT (code) DO NOTHING;
