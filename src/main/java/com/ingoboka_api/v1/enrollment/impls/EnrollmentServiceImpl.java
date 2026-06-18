@@ -23,6 +23,7 @@ import com.ingoboka_api.v1.enrollment.repositories.QuoteAnswerRepository;
 import com.ingoboka_api.v1.enrollment.repositories.QuoteRepository;
 import com.ingoboka_api.v1.enrollment.services.EnrollmentService;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
+import com.ingoboka_api.v1.policy.services.PolicyIssuanceService;
 import com.ingoboka_api.v1.product.models.EligibilityRule;
 import com.ingoboka_api.v1.product.models.InsuranceProduct;
 import com.ingoboka_api.v1.product.models.ProductPlan;
@@ -55,6 +56,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final ProductCatalogService productCatalogService;
     private final InsuranceProductRepository productRepository;
     private final EligibilityRuleRepository eligibilityRuleRepository;
+    private final PolicyIssuanceService policyIssuanceService;
 
     @Override
     @Transactional
@@ -197,6 +199,11 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         application.setReviewedAt(Instant.now());
         application.setUpdatedAt(Instant.now());
         applicationRepository.save(application);
+
+        if (request.getStatus() == ApplicationStatus.APPROVED) {
+            policyIssuanceService.issueFromApprovedApplication(application);
+        }
+
         return toApplicationResponse(application, loadAnswers(application.getId()));
     }
 
