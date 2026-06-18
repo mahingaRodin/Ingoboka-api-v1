@@ -1,14 +1,14 @@
-package com.ingoboka_api.v1.identity.web;
+package com.ingoboka_api.v1.identity.controllers;
 
-import com.ingoboka_api.v1.common.dto.ApiResponse;
-import com.ingoboka_api.v1.identity.dto.ActivateAccountRequest;
-import com.ingoboka_api.v1.identity.dto.AuthTokensResponse;
-import com.ingoboka_api.v1.identity.dto.EmailRequest;
-import com.ingoboka_api.v1.identity.dto.LoginRequest;
-import com.ingoboka_api.v1.identity.dto.PasswordResetRequest;
-import com.ingoboka_api.v1.identity.dto.SignupRequest;
-import com.ingoboka_api.v1.identity.dto.VerifyEmailConfirmRequest;
-import com.ingoboka_api.v1.identity.service.AuthService;
+import com.ingoboka_api.v1.common.responses.ApiResponse;
+import com.ingoboka_api.v1.common.requests.ActivateAccountRequest;
+import com.ingoboka_api.v1.common.responses.AuthTokensResponse;
+import com.ingoboka_api.v1.common.requests.EmailRequest;
+import com.ingoboka_api.v1.common.requests.LoginRequest;
+import com.ingoboka_api.v1.common.requests.PasswordResetRequest;
+import com.ingoboka_api.v1.common.requests.SignupRequest;
+import com.ingoboka_api.v1.common.requests.VerifyEmailConfirmRequest;
+import com.ingoboka_api.v1.identity.services.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

@@ -1,11 +1,11 @@
-package com.ingoboka_api.v1.identity.bootstrap;
+package com.ingoboka_api.v1.identity.seeders;
 
 import com.ingoboka_api.v1.common.enums.OrganizationStatus;
 import com.ingoboka_api.v1.common.enums.UserStatus;
-import com.ingoboka_api.v1.identity.domain.Organization;
-import com.ingoboka_api.v1.identity.domain.Role;
-import com.ingoboka_api.v1.identity.domain.RoleCodes;
-import com.ingoboka_api.v1.identity.domain.User;
+import com.ingoboka_api.v1.identity.models.Organization;
+import com.ingoboka_api.v1.identity.models.Role;
+import com.ingoboka_api.v1.identity.models.RoleCodes;
+import com.ingoboka_api.v1.identity.models.User;
 import com.ingoboka_api.v1.identity.repositories.OrganizationRepository;
 import com.ingoboka_api.v1.identity.repositories.RoleRepository;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;

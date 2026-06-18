@@ -1,7 +1,7 @@
-package com.ingoboka_api.v1.identity.repository;
+package com.ingoboka_api.v1.identity.repositories;
 
 import com.ingoboka_api.v1.common.enums.VerificationTokenType;
-import com.ingoboka_api.v1.identity.domain.VerificationToken;
+import com.ingoboka_api.v1.identity.models.VerificationToken;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;

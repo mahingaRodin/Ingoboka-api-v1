@@ -1,4 +1,4 @@
-package com.ingoboka_api.v1.identity.dto;
+package com.ingoboka_api.v1.common.requests;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

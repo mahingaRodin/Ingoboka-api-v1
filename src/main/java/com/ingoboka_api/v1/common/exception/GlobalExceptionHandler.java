@@ -1,6 +1,6 @@
 package com.ingoboka_api.v1.common.exception;
 
-import com.ingoboka_api.v1.common.dto.ApiResponse;
+import com.ingoboka_api.v1.common.responses.ApiResponse;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

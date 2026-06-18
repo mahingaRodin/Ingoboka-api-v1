@@ -1,4 +1,4 @@
-package com.ingoboka_api.v1.identity.dto;
+package com.ingoboka_api.v1.common.responses;
 
 import java.util.Set;
 import java.util.UUID;

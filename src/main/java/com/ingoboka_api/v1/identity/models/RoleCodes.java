@@ -1,4 +1,4 @@
-package com.ingoboka_api.v1.identity.domain;
+package com.ingoboka_api.v1.identity.models;
 
 public final class RoleCodes {
 

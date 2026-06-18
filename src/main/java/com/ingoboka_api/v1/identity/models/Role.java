@@ -1,4 +1,4 @@
-package com.ingoboka_api.v1.identity.domain;
+package com.ingoboka_api.v1.identity.models;
 
 import com.ingoboka_api.v1.common.enums.RoleScope;
 import jakarta.persistence.Column;

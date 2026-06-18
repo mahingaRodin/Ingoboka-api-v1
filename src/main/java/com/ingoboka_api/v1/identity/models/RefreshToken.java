@@ -1,4 +1,4 @@
-package com.ingoboka_api.v1.identity.domain;
+package com.ingoboka_api.v1.identity.models;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

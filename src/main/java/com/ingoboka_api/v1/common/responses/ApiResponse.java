@@ -1,4 +1,4 @@
-package com.ingoboka_api.v1.common.dto;
+package com.ingoboka_api.v1.common.responses;
 
 import java.time.Instant;
 import lombok.Builder;

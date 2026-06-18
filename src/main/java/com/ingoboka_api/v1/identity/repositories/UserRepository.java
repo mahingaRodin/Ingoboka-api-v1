@@ -1,6 +1,8 @@
-package com.ingoboka_api.v1.identity.repository;
+package com.ingoboka_api.v1.identity.repositories;
 
-import com.ingoboka_api.v1.identity.domain.User;
+import com.ingoboka_api.v1.identity.models.User;
+
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -14,4 +16,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmailIgnoreCase(String email);
 
     boolean existsByPhoneNumber(String phoneNumber);
+
+    List<User> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
+
+    Optional<User> findByIdAndOrganizationId(UUID id, UUID organizationId);
 }

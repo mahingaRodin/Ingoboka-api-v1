@@ -1,6 +1,6 @@
 package com.ingoboka_api.v1.common.security;
 
-import com.ingoboka_api.v1.identity.domain.User;
+import com.ingoboka_api.v1.identity.models.User;
 import java.util.Collection;
 import java.util.Set;
 import java.util.UUID;
