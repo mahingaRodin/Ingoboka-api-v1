@@ -48,18 +48,6 @@ services:
     networks:
       - ingoboka-net
 
-  mailhog:
-    image: mailhog/mailhog:v1.0.1
-    container_name: ingoboka-mailhog
-    restart: unless-stopped
-    profiles:
-      - dev
-    ports:
-      - "${MAILHOG_SMTP_PORT:-1025}:1025"
-      - "${MAILHOG_UI_PORT:-8025}:8025"
-    networks:
-      - ingoboka-net
-
   api:
     build:
       context: ..
@@ -82,8 +70,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET}
-      MAIL_HOST: ${MAIL_HOST}
-      MAIL_PORT: ${MAIL_PORT}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
@@ -98,12 +86,15 @@ services:
       MTN_BULK_SMS_ENABLED: ${MTN_BULK_SMS_ENABLED:-false}
     ports:
       - "${API_PORT:-8085}:8080"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     networks:
       - ingoboka-net
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
-      timeout: 5s
+      timeout: 15s
       retries: 5
       start_period: 90s
 
