@@ -2,6 +2,7 @@ package com.ingoboka_api.v1.customer.services;
 
 import com.ingoboka_api.v1.common.enums.ConsentType;
 import com.ingoboka_api.v1.common.requests.CreateDependantRequest;
+import com.ingoboka_api.v1.common.requests.FrontendConsentRequest;
 import com.ingoboka_api.v1.common.requests.GrantConsentRequest;
 import com.ingoboka_api.v1.common.requests.ReviewKycRequest;
 import com.ingoboka_api.v1.common.requests.UpdateCitizenProfileRequest;
@@ -36,4 +37,8 @@ public interface CustomerProfileService {
     Consent requireActiveConsent(UUID userId, UUID consentId);
 
     CitizenProfileResponse reviewKyc(ReviewKycRequest request);
+
+    CitizenProfileResponse submitKyc();
+
+    ConsentResponse grantFrontendConsent(FrontendConsentRequest request, String ipAddress);
 }

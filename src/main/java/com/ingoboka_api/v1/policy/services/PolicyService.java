@@ -2,6 +2,7 @@ package com.ingoboka_api.v1.policy.services;
 
 import com.ingoboka_api.v1.common.requests.AttachPolicyDocumentRequest;
 import com.ingoboka_api.v1.common.responses.PageResponse;
+import com.ingoboka_api.v1.common.responses.PolicyCardResponse;
 import com.ingoboka_api.v1.common.responses.PolicyResponse;
 import com.ingoboka_api.v1.common.responses.PolicyVerificationResponse;
 import com.ingoboka_api.v1.common.responses.PremiumScheduleResponse;
@@ -23,4 +24,6 @@ public interface PolicyService {
     Policy requirePolicyForPayment(UUID policyId, UUID citizenProfileId);
 
     PageResponse<PremiumScheduleResponse> listPremiumSchedules(UUID policyId, int page, int size);
+
+    PolicyCardResponse getPolicyCard(UUID policyId);
 }

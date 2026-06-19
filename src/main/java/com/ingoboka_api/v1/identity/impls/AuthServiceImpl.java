@@ -1,7 +1,11 @@
 package com.ingoboka_api.v1.identity.impls;
 
+import com.ingoboka_api.v1.common.config.OtpDeliveryProperties;
+import com.ingoboka_api.v1.common.enums.OtpDeliveryChannel;
 import com.ingoboka_api.v1.common.config.JwtProperties;
 import com.ingoboka_api.v1.common.config.SecurityProperties;
+import com.ingoboka_api.v1.common.enums.ConsentType;
+import com.ingoboka_api.v1.common.enums.KycStatus;
 import com.ingoboka_api.v1.common.enums.NotificationChannel;
 import com.ingoboka_api.v1.common.enums.UserStatus;
 import com.ingoboka_api.v1.common.enums.VerificationTokenType;
@@ -10,7 +14,10 @@ import com.ingoboka_api.v1.common.requests.*;
 import com.ingoboka_api.v1.common.responses.AuthTokensResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.JwtService;
-import com.ingoboka_api.v1.identity.models.*;
+import com.ingoboka_api.v1.common.util.HashUtils;
+import com.ingoboka_api.v1.customer.models.CitizenProfile;
+import com.ingoboka_api.v1.customer.repositories.CitizenProfileRepository;
+import com.ingoboka_api.v1.customer.repositories.ConsentRepository;
 import com.ingoboka_api.v1.identity.repositories.RefreshTokenRepository;
 import com.ingoboka_api.v1.identity.repositories.RoleRepository;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
@@ -18,7 +25,9 @@ import com.ingoboka_api.v1.identity.repositories.VerificationTokenRepository;
 import com.ingoboka_api.v1.identity.services.AuthService;
 import com.ingoboka_api.v1.identity.services.NotificationService;
 import com.ingoboka_api.v1.identity.services.OtpService;
+import com.ingoboka_api.v1.identity.models.*;
 import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
+import com.ingoboka_api.v1.messaging.services.SmsDeliveryService;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,10 +41,14 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
@@ -51,8 +64,13 @@ public class AuthServiceImpl implements AuthService {
     private final NotificationService notificationService;
     private final OtpService otpService;
     private final NotificationTemplateService notificationTemplateService;
+    private final CitizenProfileRepository citizenProfileRepository;
+    private final ConsentRepository consentRepository;
+    private final SmsDeliveryService smsDeliveryService;
+    private final OtpDeliveryProperties otpDeliveryProperties;
 
     private static final String OTP_PURPOSE_SIGNUP = "SIGNUP";
+    private static final String SYNTHETIC_EMAIL_DOMAIN = "@phone.ingoboka.rw";
 
     @Value("${ingoboka.security.otp.expiration-minutes:10}")
     private int otpExpirationMinutes;
@@ -90,26 +108,137 @@ public class AuthServiceImpl implements AuthService {
         sendSignupOtp(user);
     }
 
+    @Override
+    @Transactional
+    public void register(RegisterRequest request) {
+        String phone = normalizePhone(request.getPhone());
+        if (userRepository.existsByPhoneNumber(phone)) {
+            throw new BusinessException("Phone number is already registered");
+        }
+
+        String email = resolveEmail(request.getEmail(), phone);
+        if (otpDeliveryProperties.getDeliveryChannel() == OtpDeliveryChannel.EMAIL
+                && !StringUtils.hasText(request.getEmail())) {
+            throw new BusinessException(
+                    "Email is required for verification while SMS is unavailable. Provide a real email address.");
+        }
+        if (userRepository.existsByEmailIgnoreCase(email)) {
+            throw new BusinessException("Email is already registered");
+        }
+
+        String nationalIdHash = HashUtils.sha256(request.getNationalId());
+        if (nationalIdHash != null && citizenProfileRepository.existsByNationalIdHash(nationalIdHash)) {
+            throw new BusinessException("National ID is already registered");
+        }
+
+        String[] nameParts = splitFullName(request.getFullName());
+        Role citizenRole = roleRepository
+                .findByCode(RoleCodes.CITIZEN)
+                .orElseThrow(() -> new BusinessException("Citizen role is not configured"));
+
+        Instant now = Instant.now();
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setEmail(email);
+        user.setPhoneNumber(phone);
+        user.setFirstName(nameParts[0]);
+        user.setLastName(nameParts[1]);
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setStatus(UserStatus.PENDING_EMAIL_VERIFICATION);
+        user.setEmailVerified(false);
+        user.setPhoneVerified(false);
+        user.setCreatedAt(now);
+        user.setUpdatedAt(now);
+        user.getRoles().add(citizenRole);
+        userRepository.save(user);
+
+        CitizenProfile profile = new CitizenProfile();
+        profile.setId(UUID.randomUUID());
+        profile.setUserId(user.getId());
+        profile.setNationalIdHash(nationalIdHash);
+        profile.setDateOfBirth(LocalDate.now().minusYears(25));
+        profile.setCountry("RW");
+        profile.setPreferredLanguage("en");
+        profile.setKycStatus(KycStatus.PENDING);
+        profile.setCreatedAt(now);
+        profile.setUpdatedAt(now);
+        citizenProfileRepository.save(profile);
+
+        sendSignupOtp(user);
+    }
+
+    private String normalizePhone(String phone) {
+        return phone != null ? phone.trim() : "";
+    }
+
+    private String resolveEmail(String email, String phone) {
+        if (email != null && !email.isBlank()) {
+            return email.trim().toLowerCase();
+        }
+        String digits = phone.replaceAll("\\D", "");
+        return digits + "@phone.ingoboka.rw";
+    }
+
+    private String[] splitFullName(String fullName) {
+        String trimmed = fullName.trim();
+        int space = trimmed.indexOf(' ');
+        if (space < 0) {
+            return new String[] {trimmed, trimmed};
+        }
+        return new String[] {trimmed.substring(0, space), trimmed.substring(space + 1).trim()};
+    }
+
     private void sendSignupOtp(User user) {
         String otp = otpService.generateAndStore(OTP_PURPOSE_SIGNUP, user.getPhoneNumber());
-        notificationTemplateService.sendTemplated(
-                user.getId(),
-                null,
-                "OTP_VERIFICATION",
-                NotificationChannel.EMAIL,
-                user.getEmail(),
-                Map.of("otp", otp, "minutes", String.valueOf(otpExpirationMinutes)));
+        Map<String, String> variables =
+                Map.of("otp", otp, "minutes", String.valueOf(otpExpirationMinutes));
+
+        switch (otpDeliveryProperties.getDeliveryChannel()) {
+            case EMAIL -> notificationTemplateService.sendTemplated(
+                    user.getId(),
+                    null,
+                    "OTP_VERIFICATION",
+                    NotificationChannel.EMAIL,
+                    user.getEmail(),
+                    variables);
+            case SMS -> {
+                String message = "Your Ingoboka verification code is "
+                        + otp
+                        + ". Valid for "
+                        + otpExpirationMinutes
+                        + " minutes.";
+                smsDeliveryService.send(user.getPhoneNumber(), message);
+                notificationTemplateService.sendTemplated(
+                        user.getId(),
+                        null,
+                        "OTP_VERIFICATION",
+                        NotificationChannel.SMS,
+                        user.getPhoneNumber(),
+                        variables);
+            }
+            case LOG -> log.info(
+                    "DEV OTP for phone {} (email {}): {}",
+                    user.getPhoneNumber(),
+                    user.getEmail(),
+                    otp);
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
     public AuthTokensResponse login(LoginRequest request) {
-        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(
-                request.getEmail().trim().toLowerCase(), request.getPassword()));
+        String identifier = request.resolvedIdentifier();
+        String principal = identifier.contains("@") ? identifier.toLowerCase() : identifier;
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(principal, request.getPassword()));
 
-        User user = userRepository
-                .findByEmailIgnoreCase(request.getEmail())
-                .orElseThrow(() -> new BusinessException("Invalid credentials"));
+        User user = identifier.contains("@")
+                ? userRepository
+                        .findByEmailIgnoreCase(identifier)
+                        .orElseThrow(() -> new BusinessException("Invalid credentials"))
+                : userRepository
+                        .findByPhoneNumber(identifier)
+                        .orElseThrow(() -> new BusinessException("Invalid credentials"));
 
         if (user.getStatus() == UserStatus.PENDING_EMAIL_VERIFICATION || !user.isPhoneVerified()) {
             throw new BusinessException("Please verify your account with OTP before logging in");
@@ -148,7 +277,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public void verifyOtp(VerifyOtpRequest request) {
+    public AuthTokensResponse verifyOtp(VerifyOtpRequest request) {
         otpService.verify(OTP_PURPOSE_SIGNUP, request.getPhoneNumber(), request.getOtp());
         User user = userRepository
                 .findByPhoneNumber(request.getPhoneNumber())
@@ -158,6 +287,7 @@ public class AuthServiceImpl implements AuthService {
         user.setStatus(UserStatus.ACTIVE);
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
+        return buildAuthResponse(user);
     }
 
     @Override
@@ -182,6 +312,20 @@ public class AuthServiceImpl implements AuthService {
         stored.setRevoked(true);
         refreshTokenRepository.save(stored);
         return buildAuthResponse(stored.getUser());
+    }
+
+    @Override
+    @Transactional
+    public void logout(LogoutRequest request) {
+        if (request.getRefreshToken() == null || request.getRefreshToken().isBlank()) {
+            return;
+        }
+        refreshTokenRepository
+                .findByTokenHashAndRevokedFalse(hashToken(request.getRefreshToken()))
+                .ifPresent(token -> {
+                    token.setRevoked(true);
+                    refreshTokenRepository.save(token);
+                });
     }
 
     @Override
@@ -225,21 +369,33 @@ public class AuthServiceImpl implements AuthService {
         IngobokaUserDetails userDetails = new IngobokaUserDetails(user);
         String accessToken = jwtService.generateAccessToken(userDetails);
         String refreshToken = createRefreshToken(user);
+        long expiresMinutes = jwtProperties.getAccessTokenExpirationMinutes();
+        String primaryRole = user.getRoles().stream().findFirst().map(Role::getCode).orElse(RoleCodes.CITIZEN);
+        boolean consentGiven = consentRepository
+                .findByUserIdAndConsentTypeAndGrantedTrueAndRevokedAtIsNull(
+                        user.getId(), ConsentType.DATA_PROCESSING)
+                .isPresent();
 
         return AuthTokensResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
-                .expiresInMinutes(jwtProperties.getAccessTokenExpirationMinutes())
+                .expiresInMinutes(expiresMinutes)
+                .expiresIn(expiresMinutes * 60)
                 .user(AuthTokensResponse.UserSummaryResponse.builder()
                         .id(user.getId())
                         .email(user.getEmail())
                         .firstName(user.getFirstName())
                         .lastName(user.getLastName())
+                        .fullName(user.getFirstName() + " " + user.getLastName())
+                        .phone(user.getPhoneNumber())
                         .status(user.getStatus().name())
                         .roles(user.getRoles().stream().map(Role::getCode).collect(Collectors.toSet()))
+                        .role(primaryRole)
                         .organizationId(
                                 user.getOrganization() != null ? user.getOrganization().getId() : null)
+                        .verified(user.isPhoneVerified())
+                        .consentGiven(consentGiven)
                         .build())
                 .build();
     }

@@ -94,6 +94,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-ingoboka-documents}
       OTP_STORAGE: redis
+      OTP_DELIVERY_CHANNEL: ${OTP_DELIVERY_CHANNEL:-email}
+      MTN_BULK_SMS_ENABLED: ${MTN_BULK_SMS_ENABLED:-false}
     ports:
       - "${API_PORT:-8085}:8080"
     networks:

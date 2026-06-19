@@ -15,8 +15,10 @@ public class IngobokaUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) {
+        String normalized = username.trim();
         return userRepository
-                .findByEmailIgnoreCase(username)
+                .findByEmailIgnoreCase(normalized)
+                .or(() -> userRepository.findByPhoneNumber(normalized))
                 .map(IngobokaUserDetails::new)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }

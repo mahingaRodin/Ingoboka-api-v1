@@ -5,6 +5,7 @@ import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.messaging.models.NotificationTemplate;
 import com.ingoboka_api.v1.messaging.repositories.NotificationTemplateRepository;
 import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
+import com.ingoboka_api.v1.messaging.services.SmsDeliveryService;
 import com.ingoboka_api.v1.messaging.services.UserNotificationService;
 import java.util.Map;
 import java.util.UUID;
@@ -22,6 +23,7 @@ public class NotificationTemplateServiceImpl implements NotificationTemplateServ
     private final NotificationTemplateRepository notificationTemplateRepository;
     private final UserNotificationService userNotificationService;
     private final JavaMailSender mailSender;
+    private final SmsDeliveryService smsDeliveryService;
 
     @Override
     public void sendTemplated(
@@ -51,7 +53,12 @@ public class NotificationTemplateServiceImpl implements NotificationTemplateServ
                 log.warn("Email delivery failed for {}: {}", templateCode, ex.getMessage());
             }
         } else if (channel == NotificationChannel.SMS) {
-            log.info("SMS simulated to user {} [{}]: {}", userId, templateCode, body);
+            String phone = recipientEmail;
+            if (phone != null && !phone.isBlank()) {
+                smsDeliveryService.send(phone, body);
+            } else {
+                log.warn("SMS skipped for {} — no phone recipient", templateCode);
+            }
         }
     }
 

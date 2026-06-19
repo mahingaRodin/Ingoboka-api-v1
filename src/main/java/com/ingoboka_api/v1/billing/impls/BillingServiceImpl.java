@@ -20,6 +20,7 @@ import com.ingoboka_api.v1.common.requests.PaymentWebhookRequest;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.PaymentInitiationResult;
 import com.ingoboka_api.v1.common.responses.PaymentResponse;
+import com.ingoboka_api.v1.common.responses.PaymentStatusResponse;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.customer.models.CitizenProfile;
@@ -32,6 +33,7 @@ import com.ingoboka_api.v1.integration.payment.SandboxPaymentAdapter;
 import com.ingoboka_api.v1.integration.services.OutboxPublisherService;
 import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
 import com.ingoboka_api.v1.policy.models.Policy;
+import com.ingoboka_api.v1.policy.repositories.PolicyRepository;
 import com.ingoboka_api.v1.policy.services.PolicyIssuanceService;
 import com.ingoboka_api.v1.policy.services.PolicyService;
 import com.ingoboka_api.v1.revenue.services.RevenueCommissionService;
@@ -62,12 +64,15 @@ public class BillingServiceImpl implements BillingService {
     private final AuditComplianceService auditComplianceService;
     private final OutboxPublisherService outboxPublisherService;
     private final PaymentProviderRegistry paymentProviderRegistry;
+    private final PolicyRepository policyRepository;
 
     @Override
     @Transactional
     public PaymentResponse initiatePayment(InitiatePaymentRequest request) {
         CitizenProfile profile = requireMyProfile();
-        Policy policy = policyService.requirePolicyForPayment(request.getPolicyId(), profile.getId());
+        UUID policyId = resolvePolicyId(request, profile);
+
+        Policy policy = policyService.requirePolicyForPayment(policyId, profile.getId());
 
         if (paymentRepository.existsByPolicyIdAndStatus(policy.getId(), PaymentStatus.PENDING)) {
             throw new BusinessException("A payment is already pending for this policy");
@@ -107,6 +112,33 @@ public class BillingServiceImpl implements BillingService {
         paymentRepository.save(payment);
 
         return toResponse(payment, initiation);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaymentStatusResponse getPaymentStatus(UUID paymentId) {
+        Payment payment = paymentRepository
+                .findById(paymentId)
+                .orElseThrow(() -> new BusinessException("Payment not found"));
+        return PaymentStatusResponse.builder()
+                .id(payment.getId())
+                .status(payment.getStatus())
+                .paymentReference(payment.getProviderReference())
+                .build();
+    }
+
+    private UUID resolvePolicyId(InitiatePaymentRequest request, CitizenProfile profile) {
+        if (request.getPolicyId() != null) {
+            return request.getPolicyId();
+        }
+        if (request.getApplicationId() == null) {
+            throw new BusinessException("policyId or applicationId is required");
+        }
+        return policyRepository
+                .findByApplicationId(request.getApplicationId())
+                .filter(p -> p.getCitizenProfileId().equals(profile.getId()))
+                .map(Policy::getId)
+                .orElseThrow(() -> new BusinessException("No policy found for application"));
     }
 
     @Override

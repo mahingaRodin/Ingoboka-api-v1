@@ -4,6 +4,7 @@ import com.ingoboka_api.v1.common.enums.ConsentType;
 import com.ingoboka_api.v1.common.enums.KycStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.CreateDependantRequest;
+import com.ingoboka_api.v1.common.requests.FrontendConsentRequest;
 import com.ingoboka_api.v1.common.requests.GrantConsentRequest;
 import com.ingoboka_api.v1.common.requests.ReviewKycRequest;
 import com.ingoboka_api.v1.common.requests.UpdateCitizenProfileRequest;
@@ -265,5 +266,48 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
         profile.setUpdatedAt(Instant.now());
         citizenProfileRepository.save(profile);
         return toResponse(profile);
+    }
+
+    @Override
+    @Transactional
+    public CitizenProfileResponse submitKyc() {
+        CitizenProfile profile = requireMyProfile();
+        if (profile.getNationalIdHash() == null || profile.getNationalIdHash().isBlank()) {
+            throw new BusinessException("National ID is required before KYC submission");
+        }
+        if (profile.getKycStatus() == KycStatus.SUBMITTED || profile.getKycStatus() == KycStatus.VERIFIED) {
+            return toResponse(profile);
+        }
+        profile.setKycStatus(KycStatus.SUBMITTED);
+        profile.setUpdatedAt(Instant.now());
+        return toResponse(citizenProfileRepository.save(profile));
+    }
+
+    @Override
+    @Transactional
+    public ConsentResponse grantFrontendConsent(FrontendConsentRequest request, String ipAddress) {
+        ConsentResponse last = null;
+        if (request.isTermsAccepted()) {
+            GrantConsentRequest terms = new GrantConsentRequest();
+            terms.setConsentType(ConsentType.TERMS_OF_SERVICE);
+            terms.setVersion("1.0");
+            last = grantConsent(terms, ipAddress);
+        }
+        if (request.isDataProcessing()) {
+            GrantConsentRequest data = new GrantConsentRequest();
+            data.setConsentType(ConsentType.DATA_PROCESSING);
+            data.setVersion("1.0");
+            last = grantConsent(data, ipAddress);
+        }
+        if (request.isMarketing()) {
+            GrantConsentRequest marketing = new GrantConsentRequest();
+            marketing.setConsentType(ConsentType.MARKETING);
+            marketing.setVersion("1.0");
+            last = grantConsent(marketing, ipAddress);
+        }
+        if (last == null) {
+            throw new BusinessException("At least one consent flag must be true");
+        }
+        return last;
     }
 }

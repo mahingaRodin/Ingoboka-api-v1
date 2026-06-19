@@ -13,6 +13,7 @@ public class AuthTokensResponse {
     String refreshToken;
     String tokenType;
     long expiresInMinutes;
+    long expiresIn;
     UserSummaryResponse user;
 
     @Value
@@ -22,8 +23,13 @@ public class AuthTokensResponse {
         String email;
         String firstName;
         String lastName;
+        String fullName;
+        String phone;
         String status;
         Set<String> roles;
+        String role;
         UUID organizationId;
+        boolean verified;
+        boolean consentGiven;
     }
 }

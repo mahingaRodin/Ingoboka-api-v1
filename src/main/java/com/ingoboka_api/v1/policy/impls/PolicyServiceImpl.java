@@ -7,6 +7,7 @@ import com.ingoboka_api.v1.common.enums.PremiumScheduleStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.AttachPolicyDocumentRequest;
 import com.ingoboka_api.v1.common.responses.PageResponse;
+import com.ingoboka_api.v1.common.responses.PolicyCardResponse;
 import com.ingoboka_api.v1.common.responses.PolicyResponse;
 import com.ingoboka_api.v1.common.responses.PolicyVerificationResponse;
 import com.ingoboka_api.v1.common.responses.PremiumScheduleResponse;
@@ -338,5 +339,32 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
 
     private String generatePolicyNumber() {
         return "POL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PolicyCardResponse getPolicyCard(UUID policyId) {
+        Policy policy = policyRepository
+                .findById(policyId)
+                .orElseThrow(() -> new BusinessException("Policy not found"));
+        assertCanAccessPolicy(policy);
+        User holder = userRepository
+                .findById(citizenProfileRepository
+                        .findById(policy.getCitizenProfileId())
+                        .orElseThrow(() -> new BusinessException("Profile not found"))
+                        .getUserId())
+                .orElseThrow(() -> new BusinessException("Policy holder not found"));
+        return PolicyCardResponse.builder()
+                .policyId(policy.getId())
+                .policyNumber(policy.getPolicyNumber())
+                .holderName(holder.getFirstName() + " " + holder.getLastName())
+                .productName("Insurance Plan")
+                .status(policy.getStatus())
+                .premium(policy.getPremiumAmount())
+                .startDate(policy.getStartDate())
+                .endDate(policy.getEndDate())
+                .qrToken(policy.getQrVerificationToken())
+                .verificationUrl("/api/v1/verify/" + policy.getQrVerificationToken())
+                .build();
     }
 }
