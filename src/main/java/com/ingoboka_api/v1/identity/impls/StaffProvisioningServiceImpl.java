@@ -1,30 +1,25 @@
 package com.ingoboka_api.v1.identity.impls;
 
-import com.ingoboka_api.v1.common.config.SecurityProperties;
 import com.ingoboka_api.v1.common.enums.RoleScope;
 import com.ingoboka_api.v1.common.enums.UserStatus;
-import com.ingoboka_api.v1.common.enums.VerificationTokenType;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.responses.StaffCreatedResponse;
+import com.ingoboka_api.v1.common.util.TemporaryPasswordGenerator;
 import com.ingoboka_api.v1.identity.models.Organization;
 import com.ingoboka_api.v1.identity.models.Role;
 import com.ingoboka_api.v1.identity.models.User;
-import com.ingoboka_api.v1.identity.models.VerificationToken;
 import com.ingoboka_api.v1.identity.repositories.OrganizationRepository;
 import com.ingoboka_api.v1.identity.repositories.RoleRepository;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
-import com.ingoboka_api.v1.identity.repositories.VerificationTokenRepository;
 import com.ingoboka_api.v1.identity.services.NotificationService;
 import com.ingoboka_api.v1.identity.services.StaffProvisioningService;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -33,9 +28,8 @@ public class StaffProvisioningServiceImpl implements StaffProvisioningService {
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final VerificationTokenRepository verificationTokenRepository;
     private final NotificationService notificationService;
-    private final SecurityProperties securityProperties;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -46,6 +40,20 @@ public class StaffProvisioningServiceImpl implements StaffProvisioningService {
             String firstName,
             String lastName,
             String roleCode) {
+        return createStaffMemberWithDefaultPassword(
+                organizationId, email, phoneNumber, firstName, lastName, roleCode, null);
+    }
+
+    @Override
+    @Transactional
+    public StaffCreatedResponse createStaffMemberWithDefaultPassword(
+            UUID organizationId,
+            String email,
+            String phoneNumber,
+            String firstName,
+            String lastName,
+            String roleCode,
+            String defaultPassword) {
 
         Organization organization = organizationRepository
                 .findById(organizationId)
@@ -59,9 +67,12 @@ public class StaffProvisioningServiceImpl implements StaffProvisioningService {
                 .findByCode(roleCode)
                 .orElseThrow(() -> new BusinessException("Role not found: " + roleCode));
 
-        if (role.getScope() != RoleScope.TENANT) {
-            throw new BusinessException("Only tenant-scoped roles can be assigned to staff");
+        if (role.getScope() == RoleScope.CUSTOMER) {
+            throw new BusinessException("Citizen roles cannot be provisioned as staff");
         }
+
+        String temporaryPassword =
+                StringUtils.hasText(defaultPassword) ? defaultPassword : TemporaryPasswordGenerator.generate(12);
 
         Instant now = Instant.now();
         User user = new User();
@@ -71,46 +82,25 @@ public class StaffProvisioningServiceImpl implements StaffProvisioningService {
         user.setPhoneNumber(phoneNumber);
         user.setFirstName(firstName.trim());
         user.setLastName(lastName.trim());
-        user.setPasswordHash(null);
-        user.setStatus(UserStatus.PENDING_ACTIVATION);
+        user.setPasswordHash(passwordEncoder.encode(temporaryPassword));
+        user.setStatus(UserStatus.PENDING_PASSWORD_CHANGE);
+        user.setMustChangePassword(true);
         user.setEmailVerified(false);
+        user.setPhoneVerified(false);
         user.setCreatedAt(now);
         user.setUpdatedAt(now);
         user.getRoles().add(role);
         userRepository.save(user);
 
-        String rawToken = issueActivationToken(user);
+        notificationService.sendStaffWelcomeEmail(user, organization.getName(), temporaryPassword);
 
         return StaffCreatedResponse.builder()
                 .userId(user.getId())
                 .email(user.getEmail())
                 .roleCode(roleCode)
                 .organizationId(organizationId)
-                .activationRequired(true)
+                .activationRequired(false)
+                .mustChangePassword(true)
                 .build();
-    }
-
-    private String issueActivationToken(User user) {
-        String rawToken = UUID.randomUUID().toString();
-        VerificationToken token = new VerificationToken();
-        token.setId(UUID.randomUUID());
-        token.setUser(user);
-        token.setTokenHash(hashToken(rawToken));
-        token.setType(VerificationTokenType.ACCOUNT_ACTIVATION);
-        token.setExpiresAt(Instant.now().plusSeconds(securityProperties.getActivationTokenExpirationHours() * 3600L));
-        token.setCreatedAt(Instant.now());
-        verificationTokenRepository.save(token);
-        notificationService.sendVerificationToken(user.getEmail(), rawToken, VerificationTokenType.ACCOUNT_ACTIVATION);
-        return rawToken;
-    }
-
-    private String hashToken(String rawToken) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 not available", ex);
-        }
     }
 }

@@ -1,0 +1,13 @@
+Subject: Verify your Ingoboka email address
+
+Hello {{fullName}},
+
+Please verify your email address to activate your Ingoboka account.
+
+Verification token: {{token}}
+
+Or open: {{verifyUrl}}
+
+This link expires in {{hours}} hours.
+
+— Ingoboka Platform

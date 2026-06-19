@@ -12,4 +12,13 @@ public interface StaffProvisioningService {
             String firstName,
             String lastName,
             String roleCode);
+
+    StaffCreatedResponse createStaffMemberWithDefaultPassword(
+            UUID organizationId,
+            String email,
+            String phoneNumber,
+            String firstName,
+            String lastName,
+            String roleCode,
+            String defaultPassword);
 }

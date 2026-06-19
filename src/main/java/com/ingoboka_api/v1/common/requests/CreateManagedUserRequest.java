@@ -3,10 +3,11 @@ package com.ingoboka_api.v1.common.requests;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.UUID;
 import lombok.Data;
 
 @Data
-public class CreateStaffRequest {
+public class CreateManagedUserRequest {
 
     @NotBlank(message = "First name is required")
     private String firstName;
@@ -19,6 +20,8 @@ public class CreateStaffRequest {
     private String email;
 
     private String phoneNumber;
+
+    private UUID organizationId;
 
     @NotBlank(message = "Role code is required")
     private String roleCode;

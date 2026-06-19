@@ -28,9 +28,8 @@ public class IngobokaUserDetails implements UserDetails {
         this.organizationId = user.getOrganization() != null ? user.getOrganization().getId() : null;
         this.roleCodes = user.getRoles().stream().map(role -> role.getCode()).collect(Collectors.toSet());
         this.enabled = switch (user.getStatus()) {
-            case ACTIVE -> true;
-            case PENDING_EMAIL_VERIFICATION, PENDING_ACTIVATION -> false;
-            case LOCKED, DISABLED -> false;
+            case ACTIVE, PENDING_PASSWORD_CHANGE, PENDING_EMAIL_VERIFICATION -> true;
+            case PENDING_ACTIVATION, LOCKED, DISABLED -> false;
         };
         this.accountNonLocked = user.getStatus() != com.ingoboka_api.v1.common.enums.UserStatus.LOCKED;
     }

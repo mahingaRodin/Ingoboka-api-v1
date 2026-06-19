@@ -45,13 +45,14 @@ public class PartnerServiceImpl implements PartnerService {
         PartnerProfile profile = createProfile(organization.getId(), request);
         partnerProfileRepository.save(profile);
 
-        var partnerAdmin = staffProvisioningService.createStaffMember(
+        var partnerAdmin = staffProvisioningService.createStaffMemberWithDefaultPassword(
                 organization.getId(),
                 request.getAdminEmail(),
                 request.getAdminPhone(),
                 request.getAdminFirstName(),
                 request.getAdminLastName(),
-                RoleCodes.PARTNER_ADMIN);
+                RoleCodes.PARTNER_ADMIN,
+                request.getAdminDefaultPassword());
 
         return OnboardPartnerResponse.builder()
                 .partner(toResponse(organization, profile))

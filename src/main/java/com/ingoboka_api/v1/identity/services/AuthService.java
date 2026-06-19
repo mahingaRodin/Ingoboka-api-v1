@@ -2,6 +2,7 @@ package com.ingoboka_api.v1.identity.services;
 
 import com.ingoboka_api.v1.common.requests.*;
 import com.ingoboka_api.v1.common.responses.AuthTokensResponse;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface AuthService {
     void signup(SignupRequest request);
@@ -27,4 +28,6 @@ public interface AuthService {
     void resetPassword(PasswordResetRequest request);
 
     void activateAccount(ActivateAccountRequest request);
+
+    AuthTokensResponse changePassword(ChangePasswordRequest request);
 }

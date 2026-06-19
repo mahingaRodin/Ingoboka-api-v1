@@ -25,7 +25,12 @@ import com.ingoboka_api.v1.identity.repositories.VerificationTokenRepository;
 import com.ingoboka_api.v1.identity.services.AuthService;
 import com.ingoboka_api.v1.identity.services.NotificationService;
 import com.ingoboka_api.v1.identity.services.OtpService;
-import com.ingoboka_api.v1.identity.models.*;
+import com.ingoboka_api.v1.common.security.SecurityUtils;
+import com.ingoboka_api.v1.identity.models.RefreshToken;
+import com.ingoboka_api.v1.identity.models.Role;
+import com.ingoboka_api.v1.identity.models.RoleCodes;
+import com.ingoboka_api.v1.identity.models.User;
+import com.ingoboka_api.v1.identity.models.VerificationToken;
 import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
 import com.ingoboka_api.v1.messaging.services.SmsDeliveryService;
 import java.util.Map;
@@ -78,34 +83,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void signup(SignupRequest request) {
-        if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
-            throw new BusinessException("Email is already registered");
-        }
-        if (userRepository.existsByPhoneNumber(request.getPhoneNumber())) {
-            throw new BusinessException("Phone number is already registered");
-        }
-
-        Role citizenRole = roleRepository
-                .findByCode(RoleCodes.CITIZEN)
-                .orElseThrow(() -> new BusinessException("Citizen role is not configured"));
-
-        Instant now = Instant.now();
-        User user = new User();
-        user.setId(UUID.randomUUID());
-        user.setEmail(request.getEmail().trim().toLowerCase());
-        user.setPhoneNumber(request.getPhoneNumber());
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        user.setStatus(UserStatus.PENDING_EMAIL_VERIFICATION);
-        user.setEmailVerified(false);
-        user.setPhoneVerified(false);
-        user.setCreatedAt(now);
-        user.setUpdatedAt(now);
-        user.getRoles().add(citizenRole);
-
-        userRepository.save(user);
-        sendSignupOtp(user);
+        throw new BusinessException(
+                "Staff and partner accounts are provisioned by administrators. Citizens must use POST /api/v1/auth/register");
     }
 
     @Override
@@ -194,13 +173,7 @@ public class AuthServiceImpl implements AuthService {
                 Map.of("otp", otp, "minutes", String.valueOf(otpExpirationMinutes));
 
         switch (otpDeliveryProperties.getDeliveryChannel()) {
-            case EMAIL -> notificationTemplateService.sendTemplated(
-                    user.getId(),
-                    null,
-                    "OTP_VERIFICATION",
-                    NotificationChannel.EMAIL,
-                    user.getEmail(),
-                    variables);
+            case EMAIL -> notificationService.sendOtpEmail(user.getEmail(), otp, otpExpirationMinutes);
             case SMS -> {
                 String message = "Your Ingoboka verification code is "
                         + otp
@@ -240,14 +213,23 @@ public class AuthServiceImpl implements AuthService {
                         .findByPhoneNumber(identifier)
                         .orElseThrow(() -> new BusinessException("Invalid credentials"));
 
-        if (user.getStatus() == UserStatus.PENDING_EMAIL_VERIFICATION || !user.isPhoneVerified()) {
-            throw new BusinessException("Please verify your account with OTP before logging in");
+        boolean isCitizen = user.getRoles().stream().anyMatch(role -> RoleCodes.CITIZEN.equals(role.getCode()));
+
+        if (isCitizen) {
+            if (user.getStatus() == UserStatus.PENDING_EMAIL_VERIFICATION || !user.isPhoneVerified()) {
+                throw new BusinessException("Please verify your account with OTP before logging in");
+            }
+        } else {
+            if (user.getStatus() == UserStatus.PENDING_ACTIVATION) {
+                throw new BusinessException("Please activate your account before logging in");
+            }
         }
-        if (user.getStatus() == UserStatus.PENDING_ACTIVATION) {
-            throw new BusinessException("Please activate your account before logging in");
-        }
+
         if (user.getStatus() == UserStatus.DISABLED) {
             throw new BusinessException("Account is disabled");
+        }
+        if (user.getStatus() == UserStatus.LOCKED) {
+            throw new BusinessException("Account is locked");
         }
 
         return buildAuthResponse(user);
@@ -314,8 +296,8 @@ public class AuthServiceImpl implements AuthService {
         return buildAuthResponse(stored.getUser());
     }
 
-    @Override
     @Transactional
+    @Override
     public void logout(LogoutRequest request) {
         if (request.getRefreshToken() == null || request.getRefreshToken().isBlank()) {
             return;
@@ -365,6 +347,34 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
     }
 
+    @Override
+    @Transactional
+    public AuthTokensResponse changePassword(ChangePasswordRequest request) {
+        User user = userRepository
+                .findWithDetailsById(SecurityUtils.currentUser().getUserId())
+                .orElseThrow(() -> new BusinessException("User not found"));
+
+        if (user.getPasswordHash() == null
+                || !passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new BusinessException("Current password is incorrect");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
+        user.setStatus(UserStatus.PENDING_EMAIL_VERIFICATION);
+        user.setEmailVerified(false);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        notificationService.sendTemplatedEmail(
+                user.getEmail(),
+                "password-changed",
+                Map.of("fullName", user.getFirstName() + " " + user.getLastName()));
+        issueVerificationToken(user, VerificationTokenType.EMAIL_VERIFICATION);
+
+        return buildAuthResponse(user);
+    }
+
     private AuthTokensResponse buildAuthResponse(User user) {
         IngobokaUserDetails userDetails = new IngobokaUserDetails(user);
         String accessToken = jwtService.generateAccessToken(userDetails);
@@ -375,6 +385,11 @@ public class AuthServiceImpl implements AuthService {
                 .findByUserIdAndConsentTypeAndGrantedTrueAndRevokedAtIsNull(
                         user.getId(), ConsentType.DATA_PROCESSING)
                 .isPresent();
+        boolean isCitizen = user.getRoles().stream().anyMatch(role -> RoleCodes.CITIZEN.equals(role.getCode()));
+        boolean requiresEmailVerification = !isCitizen && !user.isEmailVerified();
+        boolean accountActive = user.getStatus() == UserStatus.ACTIVE
+                && !user.isMustChangePassword()
+                && (isCitizen ? user.isPhoneVerified() : user.isEmailVerified());
 
         return AuthTokensResponse.builder()
                 .accessToken(accessToken)
@@ -394,8 +409,12 @@ public class AuthServiceImpl implements AuthService {
                         .role(primaryRole)
                         .organizationId(
                                 user.getOrganization() != null ? user.getOrganization().getId() : null)
-                        .verified(user.isPhoneVerified())
+                        .verified(isCitizen ? user.isPhoneVerified() : user.isEmailVerified())
                         .consentGiven(consentGiven)
+                        .mustChangePassword(user.isMustChangePassword())
+                        .emailVerified(user.isEmailVerified())
+                        .requiresEmailVerification(requiresEmailVerification)
+                        .accountActive(accountActive)
                         .build())
                 .build();
     }

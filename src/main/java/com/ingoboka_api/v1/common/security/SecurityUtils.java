@@ -24,4 +24,11 @@ public final class SecurityUtils {
     public static boolean isPartnerAdmin() {
         return currentUser().hasRole("PARTNER_ADMIN");
     }
+
+    public static boolean isAuthenticated() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null
+                && authentication.isAuthenticated()
+                && authentication.getPrincipal() instanceof IngobokaUserDetails;
+    }
 }

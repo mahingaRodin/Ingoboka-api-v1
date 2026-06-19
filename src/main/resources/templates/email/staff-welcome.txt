@@ -1,0 +1,16 @@
+Subject: Your Ingoboka account is ready — action required
+
+Hello {{fullName}},
+
+An administrator has created your Ingoboka account for {{organizationName}}.
+
+Sign in at: {{loginUrl}}
+Email: {{email}}
+Temporary password: {{temporaryPassword}}
+
+CRITICAL: You must change this password immediately on first login before accessing the portal.
+You will also need to verify your email address after updating your password.
+
+If you did not expect this email, contact your platform administrator.
+
+— Ingoboka Platform

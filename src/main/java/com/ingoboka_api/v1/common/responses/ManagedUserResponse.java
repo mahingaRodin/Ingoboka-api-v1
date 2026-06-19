@@ -9,7 +9,8 @@ import lombok.Value;
 
 @Value
 @Builder
-public class StaffResponse {
+public class ManagedUserResponse {
+
     UUID id;
     String email;
     String phoneNumber;
@@ -17,7 +18,11 @@ public class StaffResponse {
     String lastName;
     UserStatus status;
     boolean emailVerified;
+    boolean phoneVerified;
     boolean mustChangePassword;
+    UUID organizationId;
+    String organizationName;
     Set<String> roles;
     Instant createdAt;
+    Instant updatedAt;
 }

@@ -306,8 +306,10 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
         Organization org = organizationManagementService
                 .findById(user.getOrganizationId())
                 .orElseThrow(() -> new BusinessException("Organization not found"));
-        if (org.getType() != OrganizationType.INSURER && !user.hasRole(RoleCodes.PLATFORM_ADMIN)) {
-            throw new BusinessException("Products can only be managed by insurer tenants");
+        if (org.getType() != OrganizationType.INSURER
+                && org.getType() != OrganizationType.PARTNER
+                && !user.hasRole(RoleCodes.PLATFORM_ADMIN)) {
+            throw new BusinessException("Products can only be managed by insurer or partner tenants");
         }
         return user.getOrganizationId();
     }

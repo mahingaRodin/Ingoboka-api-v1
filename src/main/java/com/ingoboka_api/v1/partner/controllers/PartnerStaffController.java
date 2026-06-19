@@ -1,6 +1,8 @@
 package com.ingoboka_api.v1.partner.controllers;
 
 import com.ingoboka_api.v1.common.requests.CreateStaffRequest;
+import com.ingoboka_api.v1.common.requests.ResetManagedUserPasswordRequest;
+import com.ingoboka_api.v1.common.requests.UpdateStaffRequest;
 import com.ingoboka_api.v1.common.requests.UpdateStaffStatusRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
@@ -15,10 +17,12 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,7 +41,7 @@ public class PartnerStaffController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'PARTNER_ADMIN')")
-    @Operation(summary = "Create staff member", description = "Invite staff with tenant role; sends activation email")
+    @Operation(summary = "Create staff member", description = "Creates staff with emailed temporary password; must change password before portal access")
     public ApiResponse<StaffCreatedResponse> createStaff(
             @PathVariable UUID partnerId, @Valid @RequestBody CreateStaffRequest request) {
         return ApiResponse.ok("Staff member created", partnerStaffService.createStaff(partnerId, request));
@@ -51,6 +55,44 @@ public class PartnerStaffController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok("Staff retrieved", partnerStaffService.listStaff(partnerId, page, size));
+    }
+
+    @GetMapping("/{userId}")
+    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'PARTNER_ADMIN')")
+    @Operation(summary = "Get staff member")
+    public ApiResponse<StaffResponse> getStaff(@PathVariable UUID partnerId, @PathVariable UUID userId) {
+        return ApiResponse.ok("Staff retrieved", partnerStaffService.getStaff(partnerId, userId));
+    }
+
+    @PutMapping("/{userId}")
+    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'PARTNER_ADMIN')")
+    @Operation(summary = "Update staff member")
+    public ApiResponse<StaffResponse> updateStaff(
+            @PathVariable UUID partnerId,
+            @PathVariable UUID userId,
+            @Valid @RequestBody UpdateStaffRequest request) {
+        return ApiResponse.ok("Staff updated", partnerStaffService.updateStaff(partnerId, userId, request));
+    }
+
+    @PostMapping("/{userId}/reset-credentials")
+    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'PARTNER_ADMIN')")
+    @Operation(summary = "Reset staff credentials", description = "Emails a new temporary password and forces change on next login")
+    public ApiResponse<StaffResponse> resetStaffCredentials(
+            @PathVariable UUID partnerId,
+            @PathVariable UUID userId,
+            @RequestBody(required = false) ResetManagedUserPasswordRequest request) {
+        return ApiResponse.ok(
+                "Credentials reset email sent",
+                partnerStaffService.resetStaffCredentials(
+                        partnerId, userId, request != null ? request : new ResetManagedUserPasswordRequest()));
+    }
+
+    @DeleteMapping("/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'PARTNER_ADMIN')")
+    @Operation(summary = "Disable staff member")
+    public void deleteStaff(@PathVariable UUID partnerId, @PathVariable UUID userId) {
+        partnerStaffService.deleteStaff(partnerId, userId);
     }
 
     @PatchMapping("/{userId}/status")

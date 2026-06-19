@@ -31,5 +31,9 @@ public class AuthTokensResponse {
         UUID organizationId;
         boolean verified;
         boolean consentGiven;
+        boolean mustChangePassword;
+        boolean emailVerified;
+        boolean requiresEmailVerification;
+        boolean accountActive;
     }
 }

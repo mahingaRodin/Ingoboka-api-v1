@@ -8,6 +8,7 @@ import com.ingoboka_api.v1.common.responses.AuthTokensResponse;
 import com.ingoboka_api.v1.common.responses.OtpDeliveryConfigResponse;
 import com.ingoboka_api.v1.identity.services.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -104,6 +105,13 @@ public class AuthController {
     public ApiResponse<Void> resendOtp(@Valid @RequestBody ResendOtpRequest request) {
         authService.resendOtp(request);
         return ApiResponse.ok(resendOtpMessage(), null);
+    }
+
+    @PostMapping("/change-password")
+    @Operation(summary = "Change password", description = "Required after logging in with a temporary admin-provided password")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<AuthTokensResponse> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        return ApiResponse.ok("Password changed successfully", authService.changePassword(request));
     }
 
     @PostMapping("/refresh")

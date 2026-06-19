@@ -1,0 +1,11 @@
+Subject: Your Ingoboka verification code
+
+Hello,
+
+Your Ingoboka verification code is: {{otp}}
+
+This code expires in {{minutes}} minutes. Do not share it with anyone.
+
+If you did not request this code, you can ignore this email.
+
+— Ingoboka Platform

@@ -12,4 +12,5 @@ public class StaffCreatedResponse {
     String roleCode;
     UUID organizationId;
     boolean activationRequired;
+    boolean mustChangePassword;
 }

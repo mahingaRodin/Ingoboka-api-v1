@@ -27,4 +27,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @EntityGraph(attributePaths = {"roles", "roles.permissions", "organization"})
     Optional<User> findByPhoneNumber(String phoneNumber);
+
+    @EntityGraph(attributePaths = {"roles", "organization"})
+    Optional<User> findWithDetailsById(UUID id);
+
+    @EntityGraph(attributePaths = {"roles", "organization"})
+    Page<User> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

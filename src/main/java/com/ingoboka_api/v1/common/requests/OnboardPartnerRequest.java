@@ -40,4 +40,8 @@ public class OnboardPartnerRequest {
     private String adminEmail;
 
     private String adminPhone;
+
+    /** Optional. When omitted a secure temporary password is generated and emailed. */
+    @Size(min = 8, message = "Default password must be at least 8 characters")
+    private String adminDefaultPassword;
 }
