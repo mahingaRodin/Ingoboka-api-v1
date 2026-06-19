@@ -186,44 +186,6 @@ public class FrontendCompatController {
                         "totalApplications", 0));
     }
 
-    @PostMapping("/api/v1/applications/needs-assessment")
-    @PreAuthorize("hasRole('CITIZEN')")
-    @SecurityRequirement(name = "bearerAuth")
-    public ApiResponse<NeedsAssessmentResponse> needsAssessment(@RequestBody NeedsAssessmentRequest request) {
-        return ApiResponse.ok("Assessment complete", enrollmentService.assessNeeds(request));
-    }
-
-    @PostMapping("/api/v1/applications")
-    @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('CITIZEN')")
-    @SecurityRequirement(name = "bearerAuth")
-    public ApiResponse<ApplicationResponse> applicationsShortcut(@Valid @RequestBody QuickApplicationRequest request) {
-        return ApiResponse.ok("Application created", enrollmentService.createQuickApplication(request));
-    }
-
-    @PostMapping("/api/v1/applications/quick")
-    @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('CITIZEN')")
-    @SecurityRequirement(name = "bearerAuth")
-    public ApiResponse<ApplicationResponse> quickApplication(@Valid @RequestBody QuickApplicationRequest request) {
-        return ApiResponse.ok("Application created", enrollmentService.createQuickApplication(request));
-    }
-
-    @PostMapping("/api/v1/applications/{applicationId}/submit")
-    @PreAuthorize("hasRole('CITIZEN')")
-    @SecurityRequirement(name = "bearerAuth")
-    public ApiResponse<ApplicationResponse> submitApplicationAlias(@PathVariable UUID applicationId) {
-        return ApiResponse.ok("Application submitted", enrollmentService.submitApplicationById(applicationId));
-    }
-
-    @PostMapping("/api/v1/enrollments")
-    @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('CITIZEN')")
-    @SecurityRequirement(name = "bearerAuth")
-    public ApiResponse<ApplicationResponse> enrollmentsAlias(@Valid @RequestBody QuickApplicationRequest request) {
-        return ApiResponse.ok("Enrollment created", enrollmentService.createQuickApplication(request));
-    }
-
     @GetMapping("/api/v1/agent/applications")
     @PreAuthorize("hasRole('AGENT')")
     @SecurityRequirement(name = "bearerAuth")

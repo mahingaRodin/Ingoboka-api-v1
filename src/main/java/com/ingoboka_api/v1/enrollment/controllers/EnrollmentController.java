@@ -2,10 +2,13 @@ package com.ingoboka_api.v1.enrollment.controllers;
 
 import com.ingoboka_api.v1.common.enums.ApplicationStatus;
 import com.ingoboka_api.v1.common.requests.GenerateQuoteRequest;
+import com.ingoboka_api.v1.common.requests.NeedsAssessmentRequest;
+import com.ingoboka_api.v1.common.requests.QuickApplicationRequest;
 import com.ingoboka_api.v1.common.requests.ReviewApplicationRequest;
 import com.ingoboka_api.v1.common.requests.SubmitApplicationRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.ApplicationResponse;
+import com.ingoboka_api.v1.common.responses.NeedsAssessmentResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.QuoteResponse;
 import com.ingoboka_api.v1.enrollment.services.EnrollmentService;
@@ -44,12 +47,36 @@ public class EnrollmentController {
         return ApiResponse.ok("Quote generated", enrollmentService.generateQuote(request));
     }
 
+    @PostMapping("/needs-assessment")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "Needs assessment", description = "Frontend MVP shortcut before product selection")
+    public ApiResponse<NeedsAssessmentResponse> needsAssessment(@RequestBody NeedsAssessmentRequest request) {
+        return ApiResponse.ok("Assessment complete", enrollmentService.assessNeeds(request));
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('CITIZEN')")
-    @Operation(summary = "Submit application", description = "Convert an active quote into an enrollment application with consent reference")
+    @Operation(
+            summary = "Create application (MVP shortcut)",
+            description = "Accepts { productPlanId } — creates quote, consent, and draft application for demo flow")
+    public ApiResponse<ApplicationResponse> createQuickApplication(@Valid @RequestBody QuickApplicationRequest request) {
+        return ApiResponse.ok("Application created", enrollmentService.createQuickApplication(request));
+    }
+
+    @PostMapping("/from-quote")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "Submit application from quote", description = "Convert an active quote into an enrollment application with consent reference")
     public ApiResponse<ApplicationResponse> submitApplication(@Valid @RequestBody SubmitApplicationRequest request) {
         return ApiResponse.ok("Application submitted", enrollmentService.submitApplication(request));
+    }
+
+    @PostMapping("/{applicationId}/submit")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "Submit application by id", description = "Validate completeness and trigger sandbox auto-approve when enabled")
+    public ApiResponse<ApplicationResponse> submitApplicationById(@PathVariable UUID applicationId) {
+        return ApiResponse.ok("Application submitted", enrollmentService.submitApplicationById(applicationId));
     }
 
     @GetMapping("/me")
