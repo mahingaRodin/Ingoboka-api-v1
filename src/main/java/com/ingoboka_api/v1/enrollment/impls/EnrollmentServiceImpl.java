@@ -516,12 +516,20 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     }
 
     private QuoteResponse toQuoteResponse(Quote quote, Map<String, String> answers) {
+        ProductPlan plan = productPlanRepository
+                .findById(quote.getProductPlanId())
+                .orElse(null);
+        InsuranceProduct product = plan != null
+                ? productRepository.findById(plan.getProductId()).orElse(null)
+                : null;
         return QuoteResponse.builder()
                 .id(quote.getId())
                 .quoteReference(quote.getQuoteReference())
                 .citizenProfileId(quote.getCitizenProfileId())
                 .organizationId(quote.getOrganizationId())
                 .productPlanId(quote.getProductPlanId())
+                .productName(product != null ? product.getName() : null)
+                .planName(plan != null ? plan.getName() : null)
                 .premiumAmount(quote.getPremiumAmount())
                 .premiumFrequency(quote.getPremiumFrequency())
                 .validUntil(quote.getValidUntil())

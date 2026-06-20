@@ -44,6 +44,9 @@ public class InsuranceProduct {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    @Column(name = "hero_image_key", length = 512)
+    private String heroImageKey;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

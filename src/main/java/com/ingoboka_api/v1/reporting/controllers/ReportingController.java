@@ -2,6 +2,7 @@ package com.ingoboka_api.v1.reporting.controllers;
 
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
+import com.ingoboka_api.v1.common.responses.PolicyReportSummaryResponse;
 import com.ingoboka_api.v1.common.responses.TenantOverviewResponse;
 import com.ingoboka_api.v1.reporting.services.ReportingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,6 +39,13 @@ public class ReportingController {
     public ApiResponse<PageResponse<?>> policyReport(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok("Policy report", reportingService.getPolicyReport(page, size));
+    }
+
+    @GetMapping("/policies/summary")
+    @PreAuthorize("hasAnyRole('PARTNER_ADMIN', 'FINANCE_OFFICER', 'PLATFORM_ADMIN', 'COMPLIANCE_AUDITOR')")
+    @Operation(summary = "Policy report aggregate stats for insurer dashboard")
+    public ApiResponse<PolicyReportSummaryResponse> policyReportSummary() {
+        return ApiResponse.ok("Policy summary", reportingService.getPolicyReportSummary());
     }
 
     @GetMapping("/claims")

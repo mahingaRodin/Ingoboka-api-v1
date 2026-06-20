@@ -9,6 +9,7 @@ import com.ingoboka_api.v1.common.enums.PolicyStatus;
 import com.ingoboka_api.v1.common.enums.RevenueLedgerStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.responses.PageResponse;
+import com.ingoboka_api.v1.common.responses.PolicyReportSummaryResponse;
 import com.ingoboka_api.v1.common.responses.TenantOverviewResponse;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.common.util.PaginationUtils;
@@ -64,6 +65,19 @@ public class ReportingServiceImpl implements ReportingService {
                 .successfulPayments(successfulPayments)
                 .pendingRevenue(pendingRevenue)
                 .settledRevenue(settledRevenue)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PolicyReportSummaryResponse getPolicyReportSummary() {
+        UUID orgId = requireTenantOrganizationId();
+        long activePolicies = policyRepository.countByOrganizationIdAndStatus(orgId, PolicyStatus.ACTIVE);
+        long citizensEnrolled =
+                policyRepository.countDistinctCitizensByOrganizationIdAndStatus(orgId, PolicyStatus.ACTIVE);
+        return PolicyReportSummaryResponse.builder()
+                .activePolicies(activePolicies)
+                .citizensEnrolled(citizensEnrolled)
                 .build();
     }
 

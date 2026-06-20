@@ -1,11 +1,14 @@
 package com.ingoboka_api.v1.reporting.services;
 
 import com.ingoboka_api.v1.common.responses.PageResponse;
+import com.ingoboka_api.v1.common.responses.PolicyReportSummaryResponse;
 import com.ingoboka_api.v1.common.responses.TenantOverviewResponse;
 
 public interface ReportingService {
 
     TenantOverviewResponse getTenantOverview();
+
+    PolicyReportSummaryResponse getPolicyReportSummary();
 
     PageResponse<?> getPolicyReport(int page, int size);
 

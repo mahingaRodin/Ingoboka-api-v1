@@ -17,5 +17,6 @@ public class ProductResponse {
     String category;
     ProductStatus status;
     Instant publishedAt;
+    String heroImageUrl;
     Instant createdAt;
 }

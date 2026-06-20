@@ -9,6 +9,8 @@ import java.time.LocalDate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface PolicyRepository extends JpaRepository<Policy, UUID> {
 
@@ -27,6 +29,11 @@ public interface PolicyRepository extends JpaRepository<Policy, UUID> {
     boolean existsByApplicationId(UUID applicationId);
 
     long countByOrganizationIdAndStatus(UUID organizationId, PolicyStatus status);
+
+    @Query(
+            "SELECT COUNT(DISTINCT p.citizenProfileId) FROM Policy p WHERE p.organizationId = :organizationId AND p.status = :status")
+    long countDistinctCitizensByOrganizationIdAndStatus(
+            @Param("organizationId") UUID organizationId, @Param("status") PolicyStatus status);
 
     List<Policy> findByStatus(PolicyStatus status);
 

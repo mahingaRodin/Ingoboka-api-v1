@@ -1,6 +1,7 @@
 package com.ingoboka_api.v1.common.responses;
 
 import java.util.List;
+import java.util.UUID;
 import lombok.Builder;
 import lombok.Value;
 
@@ -11,7 +12,17 @@ public class ProductDetailResponse {
     List<ProductPlanResponse> plans;
     List<FaqItem> faq;
     List<ClaimStepItem> claimSteps;
+    List<DocumentItem> documents;
     String currency;
+
+    @Value
+    @Builder
+    public static class DocumentItem {
+        UUID id;
+        String title;
+        String fileName;
+        String downloadUrl;
+    }
 
     @Value
     @Builder

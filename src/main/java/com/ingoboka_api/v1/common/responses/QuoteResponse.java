@@ -17,6 +17,8 @@ public class QuoteResponse {
     UUID citizenProfileId;
     UUID organizationId;
     UUID productPlanId;
+    String productName;
+    String planName;
     BigDecimal premiumAmount;
     PremiumFrequency premiumFrequency;
     Instant validUntil;

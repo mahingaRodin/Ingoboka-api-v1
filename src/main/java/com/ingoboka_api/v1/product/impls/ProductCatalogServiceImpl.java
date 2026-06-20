@@ -12,6 +12,7 @@ import com.ingoboka_api.v1.common.responses.ProductResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.common.util.PaginationUtils;
+import com.ingoboka_api.v1.document.util.StorageUrlResolver;
 import com.ingoboka_api.v1.identity.models.Organization;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.identity.services.OrganizationManagementService;
@@ -19,12 +20,14 @@ import com.ingoboka_api.v1.product.models.EligibilityRule;
 import com.ingoboka_api.v1.product.models.InsuranceProduct;
 import com.ingoboka_api.v1.product.models.ProductBenefit;
 import com.ingoboka_api.v1.product.models.ProductExclusion;
+import com.ingoboka_api.v1.product.models.ProductDocument;
 import com.ingoboka_api.v1.product.models.ProductFaq;
 import com.ingoboka_api.v1.product.models.ProductPlan;
 import com.ingoboka_api.v1.product.repositories.EligibilityRuleRepository;
 import com.ingoboka_api.v1.product.repositories.InsuranceProductRepository;
 import com.ingoboka_api.v1.product.repositories.ProductBenefitRepository;
 import com.ingoboka_api.v1.product.repositories.ProductExclusionRepository;
+import com.ingoboka_api.v1.product.repositories.ProductDocumentRepository;
 import com.ingoboka_api.v1.product.repositories.ProductFaqRepository;
 import com.ingoboka_api.v1.product.repositories.ProductPlanRepository;
 import com.ingoboka_api.v1.product.services.ProductCatalogService;
@@ -47,6 +50,8 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
     private final ProductExclusionRepository exclusionRepository;
     private final EligibilityRuleRepository eligibilityRuleRepository;
     private final ProductFaqRepository productFaqRepository;
+    private final ProductDocumentRepository productDocumentRepository;
+    private final StorageUrlResolver storageUrlResolver;
     private final OrganizationManagementService organizationManagementService;
 
     @Override
@@ -139,12 +144,26 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
         if (faq.isEmpty()) {
             faq = defaultFaq();
         }
+        List<ProductDetailResponse.DocumentItem> documents =
+                productDocumentRepository.findByProductIdOrderBySortOrderAsc(productId).stream()
+                        .map(this::toDocumentItem)
+                        .toList();
         return ProductDetailResponse.builder()
                 .product(toProductResponse(product))
                 .plans(plans)
                 .faq(faq)
                 .claimSteps(defaultClaimSteps())
+                .documents(documents)
                 .currency("RWF")
+                .build();
+    }
+
+    private ProductDetailResponse.DocumentItem toDocumentItem(ProductDocument document) {
+        return ProductDetailResponse.DocumentItem.builder()
+                .id(document.getId())
+                .title(document.getTitle())
+                .fileName(document.getFileName())
+                .downloadUrl(storageUrlResolver.resolveDownloadUrl(document.getObjectKey()))
                 .build();
     }
 
@@ -415,6 +434,7 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
                 .category(product.getCategory())
                 .status(product.getStatus())
                 .publishedAt(product.getPublishedAt())
+                .heroImageUrl(storageUrlResolver.resolveDownloadUrl(product.getHeroImageKey()))
                 .createdAt(product.getCreatedAt())
                 .build();
     }

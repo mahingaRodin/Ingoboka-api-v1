@@ -167,13 +167,15 @@ public class FrontendCompatController {
     @SecurityRequirement(name = "bearerAuth")
     public ApiResponse<Map<String, Object>> adminReportsOverview() {
         TenantOverviewResponse overview = reportingService.getTenantOverview();
+        PolicyReportSummaryResponse policySummary = reportingService.getPolicyReportSummary();
         return ApiResponse.ok(
                 "Overview",
                 Map.of(
                         "openClaims", overview.getOpenClaims(),
                         "activePolicies", overview.getActivePolicies(),
                         "pendingApplications", overview.getPendingApplications(),
-                        "successfulPayments", overview.getSuccessfulPayments()));
+                        "successfulPayments", overview.getSuccessfulPayments(),
+                        "citizensEnrolled", policySummary.getCitizensEnrolled()));
     }
 
     @GetMapping("/api/v1/admin/reports/claims-breakdown")

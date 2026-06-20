@@ -34,11 +34,13 @@ import com.ingoboka_api.v1.policy.repositories.PolicyRepository;
 import com.ingoboka_api.v1.product.models.InsuranceProduct;
 import com.ingoboka_api.v1.product.models.ProductBenefit;
 import com.ingoboka_api.v1.product.models.ProductExclusion;
+import com.ingoboka_api.v1.product.models.ProductDocument;
 import com.ingoboka_api.v1.product.models.ProductFaq;
 import com.ingoboka_api.v1.product.models.ProductPlan;
 import com.ingoboka_api.v1.product.repositories.InsuranceProductRepository;
 import com.ingoboka_api.v1.product.repositories.ProductBenefitRepository;
 import com.ingoboka_api.v1.product.repositories.ProductExclusionRepository;
+import com.ingoboka_api.v1.product.repositories.ProductDocumentRepository;
 import com.ingoboka_api.v1.product.repositories.ProductFaqRepository;
 import com.ingoboka_api.v1.product.repositories.ProductPlanRepository;
 import java.math.BigDecimal;
@@ -63,6 +65,10 @@ public class DemoDataSeeder implements ApplicationRunner {
 
     private static final String DEMO_ORG_CODE = "DEMO_INSURER";
     private static final String DEMO_PASSWORD = "Ingoboka@2026";
+    private static final String DEMO_HERO_IMAGE_URL =
+            "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&q=80";
+    private static final String DEMO_POLICY_PDF_URL =
+            "https://www.w3.org/WAI/WCAG21/Techniques/pdf/img/table-example.pdf";
 
     private final OrganizationRepository organizationRepository;
     private final OrganizationManagementService organizationManagementService;
@@ -77,6 +83,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     private final ProductBenefitRepository benefitRepository;
     private final ProductExclusionRepository exclusionRepository;
     private final ProductFaqRepository productFaqRepository;
+    private final ProductDocumentRepository productDocumentRepository;
     private final PolicyApplicationRepository applicationRepository;
     private final PolicyRepository policyRepository;
     private final ClaimRepository claimRepository;
@@ -136,6 +143,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         savePlan(product.getId(), "PA-DAILY", "Daily Plan", PremiumFrequency.DAILY, 150, now);
         savePlan(product.getId(), "PA-WEEKLY", "Weekly Plan", PremiumFrequency.WEEKLY, 350, now);
         saveProductFaq(product.getId(), now);
+        saveProductDocument(product.getId(), now);
 
         PolicyApplication application = saveApplication(profile, org.getId(), monthlyPlan, consent.getId(), now);
         Policy policy = savePolicy(application, profile, monthlyPlan, now);
@@ -255,6 +263,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         product.setDescription("Affordable accident protection for informal workers.");
         product.setCategory("PERSONAL_ACCIDENT");
         product.setStatus(ProductStatus.PUBLISHED);
+        product.setHeroImageKey(DEMO_HERO_IMAGE_URL);
         product.setPublishedAt(now);
         product.setCreatedAt(now);
         product.setUpdatedAt(now);
@@ -312,6 +321,18 @@ public class DemoDataSeeder implements ApplicationRunner {
         faq.setSortOrder(0);
         faq.setCreatedAt(now);
         productFaqRepository.save(faq);
+    }
+
+    private void saveProductDocument(UUID productId, Instant now) {
+        ProductDocument document = new ProductDocument();
+        document.setId(UUID.randomUUID());
+        document.setProductId(productId);
+        document.setTitle("Policy Summary");
+        document.setFileName("policy-summary.pdf");
+        document.setObjectKey(DEMO_POLICY_PDF_URL);
+        document.setSortOrder(0);
+        document.setCreatedAt(now);
+        productDocumentRepository.save(document);
     }
 
     private PolicyApplication saveApplication(
