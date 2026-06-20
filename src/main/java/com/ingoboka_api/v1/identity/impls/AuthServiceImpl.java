@@ -198,7 +198,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthTokensResponse login(LoginRequest request) {
         String identifier = request.resolvedIdentifier();
         String principal = identifier.contains("@") ? identifier.toLowerCase() : identifier;

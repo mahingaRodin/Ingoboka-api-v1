@@ -2,10 +2,13 @@ package com.ingoboka_api.v1.support;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -31,6 +34,16 @@ public abstract class IntegrationTestSupport {
     protected MockMvc mockMvc;
 
     protected final ObjectMapper objectMapper = new ObjectMapper();
+
+    @BeforeEach
+    void clearLeakedSecurityContextBeforeTest() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @AfterEach
+    void clearLeakedSecurityContextAfterTest() {
+        SecurityContextHolder.clearContext();
+    }
 
     static boolean isEnabled() {
         if (!Boolean.getBoolean("integration")) {
