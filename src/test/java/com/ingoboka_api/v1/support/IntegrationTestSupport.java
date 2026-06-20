@@ -30,8 +30,7 @@ public abstract class IntegrationTestSupport {
     @Autowired
     protected MockMvc mockMvc;
 
-    @Autowired
-    protected ObjectMapper objectMapper;
+    protected final ObjectMapper objectMapper = new ObjectMapper();
 
     static boolean isEnabled() {
         if (!Boolean.getBoolean("integration")) {

@@ -30,6 +30,8 @@ public interface EnrollmentService {
 
     PageResponse<ApplicationResponse> listTenantApplications(ApplicationStatus status, int page, int size);
 
+    PageResponse<ApplicationResponse> listAgentApplications(int page, int size);
+
     ApplicationResponse reviewApplication(UUID applicationId, ReviewApplicationRequest request);
 
     ApplicationResponse createAgentAssistedApplication(String citizenPhone, UUID productPlanId);

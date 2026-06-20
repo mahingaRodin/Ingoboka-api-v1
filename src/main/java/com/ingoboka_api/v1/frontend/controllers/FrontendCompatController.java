@@ -8,6 +8,8 @@ import com.ingoboka_api.v1.common.requests.*;
 import com.ingoboka_api.v1.common.responses.*;
 import com.ingoboka_api.v1.customer.services.CustomerProfileService;
 import com.ingoboka_api.v1.enrollment.services.EnrollmentService;
+import com.ingoboka_api.v1.claim.repositories.ClaimRepository;
+import com.ingoboka_api.v1.enrollment.repositories.PolicyApplicationRepository;
 import com.ingoboka_api.v1.identity.repositories.OrganizationRepository;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.policy.repositories.PolicyRepository;
@@ -39,6 +41,8 @@ public class FrontendCompatController {
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
     private final PolicyRepository policyRepository;
+    private final PolicyApplicationRepository policyApplicationRepository;
+    private final ClaimRepository claimRepository;
 
     @GetMapping("/api/v1/customers/me")
     @PreAuthorize("hasRole('CITIZEN')")
@@ -172,18 +176,29 @@ public class FrontendCompatController {
                         "successfulPayments", overview.getSuccessfulPayments()));
     }
 
+    @GetMapping("/api/v1/admin/reports/claims-breakdown")
+    @PreAuthorize("hasAnyRole('PARTNER_ADMIN', 'CLAIMS_OFFICER', 'PLATFORM_ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<ClaimsBreakdownResponse> adminClaimsBreakdown() {
+        return ApiResponse.ok("Claims breakdown", claimService.getClaimsBreakdown());
+    }
+
     @GetMapping("/api/v1/admin/platform/overview")
     @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     public ApiResponse<Map<String, Object>> platformOverview() {
+        long openClaims = claimRepository.findAll().stream()
+                .filter(claim -> claim.getStatus() == ClaimStatus.SUBMITTED
+                        || claim.getStatus() == ClaimStatus.UNDER_REVIEW)
+                .count();
         return ApiResponse.ok(
                 "Platform overview",
                 Map.of(
                         "organizations", organizationRepository.count(),
                         "activeUsers", userRepository.count(),
                         "activePolicies", policyRepository.count(),
-                        "openClaims", 0,
-                        "totalApplications", 0));
+                        "openClaims", openClaims,
+                        "totalApplications", policyApplicationRepository.count()));
     }
 
     @GetMapping("/api/v1/agent/applications")
@@ -191,7 +206,7 @@ public class FrontendCompatController {
     @SecurityRequirement(name = "bearerAuth")
     public ApiResponse<PageResponse<ApplicationResponse>> agentApplications(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("Applications", enrollmentService.listTenantApplications(null, page, size));
+        return ApiResponse.ok("Applications", enrollmentService.listAgentApplications(page, size));
     }
 
     @PostMapping("/api/v1/agent/applications")

@@ -3,6 +3,7 @@ package com.ingoboka_api.v1.product.services;
 import com.ingoboka_api.v1.common.requests.CreateProductPlanRequest;
 import com.ingoboka_api.v1.common.requests.CreateProductRequest;
 import com.ingoboka_api.v1.common.responses.PageResponse;
+import com.ingoboka_api.v1.common.responses.ProductDetailResponse;
 import com.ingoboka_api.v1.common.responses.ProductPlanResponse;
 import com.ingoboka_api.v1.common.responses.ProductResponse;
 import com.ingoboka_api.v1.product.models.ProductPlan;
@@ -19,6 +20,8 @@ public interface ProductCatalogService {
     PageResponse<ProductResponse> listPublishedProducts(int page, int size);
 
     ProductResponse getProduct(UUID productId);
+
+    ProductDetailResponse getProductDetail(UUID productId);
 
     ProductPlanResponse createPlan(UUID productId, CreateProductPlanRequest request);
 

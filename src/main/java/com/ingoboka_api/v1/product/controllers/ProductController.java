@@ -4,6 +4,7 @@ import com.ingoboka_api.v1.common.requests.CreateProductPlanRequest;
 import com.ingoboka_api.v1.common.requests.CreateProductRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
+import com.ingoboka_api.v1.common.responses.ProductDetailResponse;
 import com.ingoboka_api.v1.common.responses.ProductPlanResponse;
 import com.ingoboka_api.v1.common.responses.ProductResponse;
 import com.ingoboka_api.v1.product.services.ProductCatalogService;
@@ -69,6 +70,13 @@ public class ProductController {
     @Operation(summary = "Get product")
     public ApiResponse<ProductResponse> getProduct(@PathVariable UUID productId) {
         return ApiResponse.ok("Product retrieved", productCatalogService.getProduct(productId));
+    }
+
+    @GetMapping("/{productId}/detail")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get product detail", description = "Structured product content for citizen detail tabs")
+    public ApiResponse<ProductDetailResponse> getProductDetail(@PathVariable UUID productId) {
+        return ApiResponse.ok("Product detail retrieved", productCatalogService.getProductDetail(productId));
     }
 
     @PostMapping("/{productId}/plans")

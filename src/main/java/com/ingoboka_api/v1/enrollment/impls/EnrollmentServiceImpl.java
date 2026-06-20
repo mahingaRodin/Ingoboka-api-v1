@@ -10,7 +10,9 @@ import com.ingoboka_api.v1.common.requests.NeedsAssessmentRequest;
 import com.ingoboka_api.v1.common.requests.QuickApplicationRequest;
 import com.ingoboka_api.v1.common.requests.ReviewApplicationRequest;
 import com.ingoboka_api.v1.common.requests.SubmitApplicationRequest;
+import com.ingoboka_api.v1.common.enums.ProductStatus;
 import com.ingoboka_api.v1.common.responses.ApplicationResponse;
+import com.ingoboka_api.v1.common.responses.RecommendedProductResponse;
 import com.ingoboka_api.v1.common.responses.NeedsAssessmentResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.QuoteResponse;
@@ -37,6 +39,7 @@ import com.ingoboka_api.v1.product.models.InsuranceProduct;
 import com.ingoboka_api.v1.product.models.ProductPlan;
 import com.ingoboka_api.v1.product.repositories.EligibilityRuleRepository;
 import com.ingoboka_api.v1.product.repositories.InsuranceProductRepository;
+import com.ingoboka_api.v1.product.repositories.ProductPlanRepository;
 import com.ingoboka_api.v1.product.services.ProductCatalogService;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -52,6 +55,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,6 +72,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final CustomerProfileService customerProfileService;
     private final ProductCatalogService productCatalogService;
     private final InsuranceProductRepository productRepository;
+    private final ProductPlanRepository productPlanRepository;
     private final EligibilityRuleRepository eligibilityRuleRepository;
     private final PolicyIssuanceService policyIssuanceService;
     private final UserRepository userRepository;
@@ -155,10 +160,34 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         if (score >= 65) {
             categories.add("HEALTH_MICRO");
         }
+        final int assessmentScore = score;
+        List<RecommendedProductResponse> recommendedProducts = productRepository
+                .findByStatusOrderByPublishedAtDesc(ProductStatus.PUBLISHED)
+                .stream()
+                .filter(product -> categories.contains(product.getCategory()))
+                .limit(3)
+                .map(product -> {
+                    var plans = productPlanRepository.findByProductIdAndStatus(product.getId(), ProductStatus.PUBLISHED);
+                    var startingPremium = plans.stream()
+                            .map(ProductPlan::getPremiumAmount)
+                            .min(java.util.Comparator.naturalOrder())
+                            .orElse(null);
+                    return RecommendedProductResponse.builder()
+                            .id(product.getId())
+                            .name(product.getName())
+                            .category(product.getCategory())
+                            .startingPremium(startingPremium)
+                            .currency("RWF")
+                            .matchScore(Math.min(100, assessmentScore + 20))
+                            .reason("Matches " + product.getCategory().replace('_', ' ').toLowerCase())
+                            .build();
+                })
+                .toList();
         return NeedsAssessmentResponse.builder()
                 .score(score)
                 .guidance("Based on your profile, consider personal accident cover first.")
                 .recommendedCategories(categories)
+                .recommendedProducts(recommendedProducts)
                 .build();
     }
 
@@ -330,6 +359,16 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     @Override
     @Transactional(readOnly = true)
+    public PageResponse<ApplicationResponse> listAgentApplications(int page, int size) {
+        UUID orgId = requireAgentOrganizationId();
+        Page<PolicyApplication> result = applicationRepository.findByOrganizationIdOrderBySubmittedAtDesc(
+                orgId, PaginationUtils.toPageable(page, size, "submittedAt"));
+        return PageResponse.from(result.map(
+                app -> toApplicationResponse(app, loadAnswers(app.getId()))));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PageResponse<ApplicationResponse> listTenantApplications(
             ApplicationStatus status, int page, int size) {
         UUID orgId = requireUnderwriterOrganizationId();
@@ -446,6 +485,17 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             return;
         }
         throw new BusinessException("Access denied to this application");
+    }
+
+    private UUID requireAgentOrganizationId() {
+        IngobokaUserDetails user = SecurityUtils.currentUser();
+        if (!user.hasRole(RoleCodes.AGENT)) {
+            throw new AccessDeniedException("Agent role required");
+        }
+        if (user.getOrganizationId() == null) {
+            throw new AccessDeniedException("No organization associated with this agent account");
+        }
+        return user.getOrganizationId();
     }
 
     private UUID requireUnderwriterOrganizationId() {

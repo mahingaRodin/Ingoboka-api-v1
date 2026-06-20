@@ -6,6 +6,7 @@ import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.CreateProductPlanRequest;
 import com.ingoboka_api.v1.common.requests.CreateProductRequest;
 import com.ingoboka_api.v1.common.responses.PageResponse;
+import com.ingoboka_api.v1.common.responses.ProductDetailResponse;
 import com.ingoboka_api.v1.common.responses.ProductPlanResponse;
 import com.ingoboka_api.v1.common.responses.ProductResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
@@ -18,14 +19,18 @@ import com.ingoboka_api.v1.product.models.EligibilityRule;
 import com.ingoboka_api.v1.product.models.InsuranceProduct;
 import com.ingoboka_api.v1.product.models.ProductBenefit;
 import com.ingoboka_api.v1.product.models.ProductExclusion;
+import com.ingoboka_api.v1.product.models.ProductFaq;
 import com.ingoboka_api.v1.product.models.ProductPlan;
 import com.ingoboka_api.v1.product.repositories.EligibilityRuleRepository;
 import com.ingoboka_api.v1.product.repositories.InsuranceProductRepository;
 import com.ingoboka_api.v1.product.repositories.ProductBenefitRepository;
 import com.ingoboka_api.v1.product.repositories.ProductExclusionRepository;
+import com.ingoboka_api.v1.product.repositories.ProductFaqRepository;
 import com.ingoboka_api.v1.product.repositories.ProductPlanRepository;
 import com.ingoboka_api.v1.product.services.ProductCatalogService;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -41,6 +46,7 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
     private final ProductBenefitRepository benefitRepository;
     private final ProductExclusionRepository exclusionRepository;
     private final EligibilityRuleRepository eligibilityRuleRepository;
+    private final ProductFaqRepository productFaqRepository;
     private final OrganizationManagementService organizationManagementService;
 
     @Override
@@ -106,6 +112,75 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
             throw new BusinessException("Product is not available");
         }
         return toProductResponse(product);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProductDetailResponse getProductDetail(UUID productId) {
+        InsuranceProduct product = productRepository
+                .findById(productId)
+                .orElseThrow(() -> new BusinessException("Product not found"));
+        if (product.getStatus() != ProductStatus.PUBLISHED && !canManageProducts(product.getOrganizationId())) {
+            throw new BusinessException("Product is not available");
+        }
+        List<ProductPlanResponse> plans = planRepository
+                .findByProductIdAndStatus(productId, ProductStatus.PUBLISHED)
+                .stream()
+                .map(plan -> buildPlanResponse(plan, true))
+                .toList();
+        List<ProductDetailResponse.FaqItem> faq = productFaqRepository.findByProductIdOrderBySortOrderAsc(productId)
+                .stream()
+                .map(item -> ProductDetailResponse.FaqItem.builder()
+                        .question(item.getQuestion())
+                        .answer(item.getAnswer())
+                        .sortOrder(item.getSortOrder())
+                        .build())
+                .toList();
+        if (faq.isEmpty()) {
+            faq = defaultFaq();
+        }
+        return ProductDetailResponse.builder()
+                .product(toProductResponse(product))
+                .plans(plans)
+                .faq(faq)
+                .claimSteps(defaultClaimSteps())
+                .currency("RWF")
+                .build();
+    }
+
+    private List<ProductDetailResponse.FaqItem> defaultFaq() {
+        List<ProductDetailResponse.FaqItem> items = new ArrayList<>();
+        items.add(ProductDetailResponse.FaqItem.builder()
+                .question("When does my cover start?")
+                .answer("Full cover begins after the waiting period from your first successful payment.")
+                .sortOrder(0)
+                .build());
+        items.add(ProductDetailResponse.FaqItem.builder()
+                .question("How do I file a claim?")
+                .answer("Open the Claims section in the app and follow the guided steps.")
+                .sortOrder(1)
+                .build());
+        return items;
+    }
+
+    private List<ProductDetailResponse.ClaimStepItem> defaultClaimSteps() {
+        List<ProductDetailResponse.ClaimStepItem> steps = new ArrayList<>();
+        steps.add(ProductDetailResponse.ClaimStepItem.builder()
+                .step(1)
+                .title("Notify via App")
+                .description("Report within 72 hours through Claims.")
+                .build());
+        steps.add(ProductDetailResponse.ClaimStepItem.builder()
+                .step(2)
+                .title("Upload Documents")
+                .description("Submit hospital records or certificates.")
+                .build());
+        steps.add(ProductDetailResponse.ClaimStepItem.builder()
+                .step(3)
+                .title("Receive Payout")
+                .description("Approved claims paid to Mobile Money.")
+                .build());
+        return steps;
     }
 
     @Override

@@ -7,6 +7,7 @@ import com.ingoboka_api.v1.common.enums.PremiumScheduleStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.AttachPolicyDocumentRequest;
 import com.ingoboka_api.v1.common.responses.PageResponse;
+import com.ingoboka_api.v1.common.responses.PolicyActivityResponse;
 import com.ingoboka_api.v1.common.responses.PolicyCardResponse;
 import com.ingoboka_api.v1.common.responses.PolicyResponse;
 import com.ingoboka_api.v1.common.responses.PolicyVerificationResponse;
@@ -18,6 +19,8 @@ import com.ingoboka_api.v1.customer.models.CitizenProfile;
 import com.ingoboka_api.v1.customer.models.Dependant;
 import com.ingoboka_api.v1.customer.repositories.CitizenProfileRepository;
 import com.ingoboka_api.v1.customer.repositories.DependantRepository;
+import com.ingoboka_api.v1.claim.models.Claim;
+import com.ingoboka_api.v1.claim.repositories.ClaimRepository;
 import com.ingoboka_api.v1.enrollment.models.PolicyApplication;
 import com.ingoboka_api.v1.identity.models.Organization;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
@@ -27,6 +30,12 @@ import com.ingoboka_api.v1.identity.services.OrganizationManagementService;
 import com.ingoboka_api.v1.billing.models.PremiumSchedule;
 import com.ingoboka_api.v1.billing.repositories.PremiumScheduleRepository;
 import com.ingoboka_api.v1.billing.services.BillingFinanceService;
+import com.ingoboka_api.v1.product.models.InsuranceProduct;
+import com.ingoboka_api.v1.product.models.ProductBenefit;
+import com.ingoboka_api.v1.product.models.ProductPlan;
+import com.ingoboka_api.v1.product.repositories.InsuranceProductRepository;
+import com.ingoboka_api.v1.product.repositories.ProductBenefitRepository;
+import com.ingoboka_api.v1.product.repositories.ProductPlanRepository;
 import com.ingoboka_api.v1.policy.models.Policy;
 import com.ingoboka_api.v1.policy.models.PolicyDocument;
 import com.ingoboka_api.v1.policy.models.PolicyMember;
@@ -35,8 +44,11 @@ import com.ingoboka_api.v1.policy.repositories.PolicyMemberRepository;
 import com.ingoboka_api.v1.policy.repositories.PolicyRepository;
 import com.ingoboka_api.v1.policy.services.PolicyIssuanceService;
 import com.ingoboka_api.v1.policy.services.PolicyService;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +69,10 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
     private final UserRepository userRepository;
     private final OrganizationManagementService organizationManagementService;
     private final BillingFinanceService billingFinanceService;
+    private final ProductPlanRepository productPlanRepository;
+    private final InsuranceProductRepository insuranceProductRepository;
+    private final ProductBenefitRepository productBenefitRepository;
+    private final ClaimRepository claimRepository;
 
     @Override
     @Transactional
@@ -296,9 +312,36 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
                 .endDate(policy.getEndDate())
                 .qrVerificationToken(policy.getQrVerificationToken())
                 .members(members)
+                .productName(resolveProductName(policy.getProductPlanId()))
+                .insurerName(resolveInsurerName(policy.getOrganizationId()))
+                .coverageAmount(resolveCoverageAmount(policy.getProductPlanId()))
+                .currency("RWF")
                 .createdAt(policy.getCreatedAt())
                 .updatedAt(policy.getUpdatedAt())
                 .build();
+    }
+
+    private String resolveProductName(UUID planId) {
+        return productPlanRepository
+                .findById(planId)
+                .flatMap(plan -> insuranceProductRepository.findById(plan.getProductId()))
+                .map(InsuranceProduct::getName)
+                .orElse("Insurance Product");
+    }
+
+    private String resolveInsurerName(UUID organizationId) {
+        return organizationManagementService
+                .findById(organizationId)
+                .map(Organization::getName)
+                .orElse("Partner Insurer");
+    }
+
+    private BigDecimal resolveCoverageAmount(UUID planId) {
+        return productBenefitRepository.findByPlanIdOrderBySortOrderAsc(planId).stream()
+                .map(ProductBenefit::getCoverageLimit)
+                .filter(limit -> limit != null)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
     }
 
     private void assertCanAccessPolicy(Policy policy) {
@@ -358,13 +401,51 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
                 .policyId(policy.getId())
                 .policyNumber(policy.getPolicyNumber())
                 .holderName(holder.getFirstName() + " " + holder.getLastName())
-                .productName("Insurance Plan")
+                .productName(resolveProductName(policy.getProductPlanId()))
                 .status(policy.getStatus())
                 .premium(policy.getPremiumAmount())
                 .startDate(policy.getStartDate())
                 .endDate(policy.getEndDate())
                 .qrToken(policy.getQrVerificationToken())
                 .verificationUrl("/api/v1/verify/" + policy.getQrVerificationToken())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<PolicyActivityResponse> listMyActivity(int page, int size) {
+        CitizenProfile profile = requireMyProfile();
+        List<PolicyActivityResponse> events = new ArrayList<>();
+        policyRepository.findByCitizenProfileIdOrderByCreatedAtDesc(profile.getId()).forEach(policy -> {
+            if (policy.getStatus() == PolicyStatus.ACTIVE) {
+                events.add(PolicyActivityResponse.builder()
+                        .type("POLICY_ACTIVATED")
+                        .label("Policy activated — " + resolveProductName(policy.getProductPlanId()))
+                        .occurredAt(policy.getCreatedAt())
+                        .policyId(policy.getId())
+                        .build());
+            }
+        });
+        claimRepository.findByCitizenProfileIdOrderByCreatedAtDesc(profile.getId()).forEach(claim -> events.add(
+                PolicyActivityResponse.builder()
+                        .type("CLAIM_SUBMITTED")
+                        .label("Claim " + claim.getClaimNumber() + " submitted")
+                        .occurredAt(claim.getCreatedAt())
+                        .policyId(claim.getPolicyId())
+                        .claimId(claim.getId())
+                        .build()));
+        events.sort(Comparator.comparing(PolicyActivityResponse::getOccurredAt).reversed());
+        int from = Math.min(page * size, events.size());
+        int to = Math.min(from + size, events.size());
+        List<PolicyActivityResponse> slice = events.subList(from, to);
+        return PageResponse.<PolicyActivityResponse>builder()
+                .content(slice)
+                .page(page)
+                .size(size)
+                .totalElements(events.size())
+                .totalPages(size == 0 ? 0 : (int) Math.ceil((double) events.size() / size))
+                .first(page == 0)
+                .last(to >= events.size())
                 .build();
     }
 }

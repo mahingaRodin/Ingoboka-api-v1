@@ -27,6 +27,10 @@ public class PolicyResponse {
     LocalDate endDate;
     String qrVerificationToken;
     List<PolicyMemberResponse> members;
+    String productName;
+    String insurerName;
+    BigDecimal coverageAmount;
+    String currency;
     Instant createdAt;
     Instant updatedAt;
 

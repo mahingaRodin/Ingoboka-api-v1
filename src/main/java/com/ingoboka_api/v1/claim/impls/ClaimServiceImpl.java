@@ -25,7 +25,9 @@ import com.ingoboka_api.v1.common.requests.CreateClaimRequest;
 import com.ingoboka_api.v1.common.requests.RecordClaimDecisionRequest;
 import com.ingoboka_api.v1.common.requests.UpdateClaimStatusRequest;
 import com.ingoboka_api.v1.common.responses.ClaimAppealResponse;
+import com.ingoboka_api.v1.common.responses.ClaimsBreakdownResponse;
 import com.ingoboka_api.v1.common.responses.ClaimResponse;
+import com.ingoboka_api.v1.common.responses.ClaimStatusHistoryItemResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
@@ -38,6 +40,11 @@ import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
 import com.ingoboka_api.v1.policy.models.Policy;
 import com.ingoboka_api.v1.policy.repositories.PolicyRepository;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -364,6 +371,23 @@ public class ClaimServiceImpl implements ClaimService {
     }
 
     private ClaimResponse toResponse(Claim claim) {
+        Policy policy = policyRepository.findById(claim.getPolicyId()).orElse(null);
+        String policyNumber = policy != null ? policy.getPolicyNumber() : null;
+        String claimantName = citizenProfileRepository
+                .findById(claim.getCitizenProfileId())
+                .flatMap(profile -> userRepository.findById(profile.getUserId()))
+                .map(user -> user.getFirstName() + " " + user.getLastName())
+                .orElse("Citizen");
+        List<ClaimStatusHistoryItemResponse> history = claimStatusHistoryRepository
+                .findByClaimIdOrderByCreatedAtAsc(claim.getId())
+                .stream()
+                .map(item -> ClaimStatusHistoryItemResponse.builder()
+                        .status(item.getToStatus())
+                        .label(item.getToStatus().name())
+                        .occurredAt(item.getCreatedAt())
+                        .note(item.getReason())
+                        .build())
+                .toList();
         return ClaimResponse.builder()
                 .id(claim.getId())
                 .claimNumber(claim.getClaimNumber())
@@ -372,7 +396,11 @@ public class ClaimServiceImpl implements ClaimService {
                 .claimType(claim.getClaimType())
                 .description(claim.getDescription())
                 .claimedAmount(claim.getClaimedAmount())
+                .currency("RWF")
+                .policyNumber(policyNumber)
+                .claimantName(claimantName)
                 .status(claim.getStatus())
+                .statusHistory(history)
                 .createdAt(claim.getCreatedAt())
                 .updatedAt(claim.getUpdatedAt())
                 .build();
@@ -387,6 +415,41 @@ public class ClaimServiceImpl implements ClaimService {
                 .submittedAt(appeal.getSubmittedAt())
                 .reviewedAt(appeal.getReviewedAt())
                 .reviewNotes(appeal.getReviewNotes())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ClaimsBreakdownResponse getClaimsBreakdown() {
+        UUID orgId = SecurityUtils.currentUser().getOrganizationId();
+        if (orgId == null && !SecurityUtils.currentUser().hasRole(RoleCodes.PLATFORM_ADMIN)) {
+            throw new BusinessException("No organization associated with this account");
+        }
+        List<Claim> claims = orgId != null
+                ? claimRepository.findByOrganizationIdOrderByCreatedAtDesc(orgId)
+                : claimRepository.findAll();
+        Instant startOfDay = LocalDate.now(ZoneOffset.UTC).atStartOfDay().toInstant(ZoneOffset.UTC);
+        long resolvedToday = claims.stream()
+                .filter(claim -> claim.getStatus() == ClaimStatus.APPROVED || claim.getStatus() == ClaimStatus.REJECTED)
+                .filter(claim -> claim.getUpdatedAt() != null && claim.getUpdatedAt().isAfter(startOfDay))
+                .count();
+        double avgResolutionDays = claims.stream()
+                .filter(claim -> claim.getStatus() == ClaimStatus.APPROVED || claim.getStatus() == ClaimStatus.REJECTED)
+                .filter(claim -> claim.getCreatedAt() != null && claim.getUpdatedAt() != null)
+                .mapToLong(claim -> ChronoUnit.DAYS.between(claim.getCreatedAt(), claim.getUpdatedAt()))
+                .average()
+                .orElse(0.0);
+        List<ClaimsBreakdownResponse.StatusCount> byStatus = Arrays.stream(ClaimStatus.values())
+                .map(status -> ClaimsBreakdownResponse.StatusCount.builder()
+                        .status(status)
+                        .count(claims.stream().filter(claim -> claim.getStatus() == status).count())
+                        .build())
+                .filter(item -> item.getCount() > 0)
+                .toList();
+        return ClaimsBreakdownResponse.builder()
+                .resolvedToday(resolvedToday)
+                .avgResolutionDays(avgResolutionDays)
+                .claimsByStatus(byStatus)
                 .build();
     }
 }

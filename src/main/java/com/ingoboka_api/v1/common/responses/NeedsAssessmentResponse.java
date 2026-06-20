@@ -11,4 +11,5 @@ public class NeedsAssessmentResponse {
     int score;
     String guidance;
     List<String> recommendedCategories;
+    List<RecommendedProductResponse> recommendedProducts;
 }

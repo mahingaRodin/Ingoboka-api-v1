@@ -7,6 +7,7 @@ import com.ingoboka_api.v1.common.requests.CreateClaimRequest;
 import com.ingoboka_api.v1.common.requests.RecordClaimDecisionRequest;
 import com.ingoboka_api.v1.common.requests.UpdateClaimStatusRequest;
 import com.ingoboka_api.v1.common.responses.ClaimAppealResponse;
+import com.ingoboka_api.v1.common.responses.ClaimsBreakdownResponse;
 import com.ingoboka_api.v1.common.responses.ClaimResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import java.util.UUID;
@@ -30,4 +31,6 @@ public interface ClaimService {
     void attachDocument(UUID claimId, AttachClaimDocumentRequest request);
 
     ClaimAppealResponse createAppeal(UUID claimId, CreateClaimAppealRequest request);
+
+    ClaimsBreakdownResponse getClaimsBreakdown();
 }

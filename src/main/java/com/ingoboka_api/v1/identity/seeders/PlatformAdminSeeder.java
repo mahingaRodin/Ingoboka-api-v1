@@ -74,6 +74,7 @@ public class PlatformAdminSeeder implements ApplicationRunner {
         admin.setPasswordHash(passwordEncoder.encode(adminPassword));
         admin.setStatus(UserStatus.ACTIVE);
         admin.setEmailVerified(true);
+        admin.setPhoneVerified(true);
         admin.setCreatedAt(now);
         admin.setUpdatedAt(now);
         admin.getRoles().add(platformAdminRole);

@@ -1,5 +1,6 @@
 package com.ingoboka_api.v1.controller;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.ingoboka_api.v1.identity.services.OtpService;
@@ -63,5 +64,13 @@ class CitizenEndpointsIntegrationTest extends IntegrationTestSupport {
         assertNotServerError(post("/api/v1/customers/me/dependants", "{}", citizenToken));
         assertNotServerError(post("/api/v1/applications/quote", "{}", citizenToken));
         assertNotServerError(post("/api/v1/claims", "{}", citizenToken));
+    }
+
+    @Test
+    void citizenCannotAccessAgentApplications() throws Exception {
+        get("/api/v1/agent/applications", citizenToken)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 }

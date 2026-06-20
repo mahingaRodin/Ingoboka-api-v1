@@ -3,6 +3,7 @@ package com.ingoboka_api.v1.policy.controllers;
 import com.ingoboka_api.v1.common.requests.AttachPolicyDocumentRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
+import com.ingoboka_api.v1.common.responses.PolicyActivityResponse;
 import com.ingoboka_api.v1.common.responses.PolicyResponse;
 import com.ingoboka_api.v1.common.responses.PolicyVerificationResponse;
 import com.ingoboka_api.v1.common.responses.PremiumScheduleResponse;
@@ -42,6 +43,15 @@ public class PolicyController {
     public ApiResponse<PageResponse<PolicyResponse>> listMyPolicies(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok("Policies retrieved", policyService.listMyPolicies(page, size));
+    }
+
+    @GetMapping("/me/activity")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "List my policy activity feed")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<PageResponse<PolicyActivityResponse>> listMyActivity(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Activity retrieved", policyService.listMyActivity(page, size));
     }
 
     @GetMapping("/tenant")
