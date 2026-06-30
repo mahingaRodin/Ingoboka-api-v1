@@ -9,6 +9,7 @@ import com.ingoboka_api.v1.messaging.services.EmailTemplateService;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,9 @@ public class NotificationServiceImpl implements NotificationService {
     private final EmailTemplateService emailTemplateService;
     private final PlatformProperties platformProperties;
     private final SecurityProperties securityProperties;
+
+    @Value("${spring.mail.username:}")
+    private String mailFrom;
 
     @Override
     public void sendVerificationToken(String email, String token, VerificationTokenType type) {
@@ -80,6 +84,9 @@ public class NotificationServiceImpl implements NotificationService {
     private void sendPlainEmail(String email, String subject, String body, String context, String devToken) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
+            if (mailFrom != null && !mailFrom.isBlank()) {
+                message.setFrom(mailFrom.trim());
+            }
             message.setTo(email);
             message.setSubject(subject);
             message.setText(body);

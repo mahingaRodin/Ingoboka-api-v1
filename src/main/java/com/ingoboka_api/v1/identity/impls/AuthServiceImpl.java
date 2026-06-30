@@ -15,6 +15,7 @@ import com.ingoboka_api.v1.common.responses.AuthTokensResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.JwtService;
 import com.ingoboka_api.v1.common.util.HashUtils;
+import com.ingoboka_api.v1.common.util.PhoneNumberUtils;
 import com.ingoboka_api.v1.customer.models.CitizenProfile;
 import com.ingoboka_api.v1.customer.repositories.CitizenProfileRepository;
 import com.ingoboka_api.v1.customer.repositories.ConsentRepository;
@@ -48,6 +49,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HexFormat;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -91,6 +93,9 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public void register(RegisterRequest request) {
         String phone = normalizePhone(request.getPhone());
+        if (phone.isBlank()) {
+            throw new BusinessException("Phone number is required");
+        }
         if (userRepository.existsByPhoneNumber(phone)) {
             throw new BusinessException("Phone number is already registered");
         }
@@ -147,7 +152,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private String normalizePhone(String phone) {
-        return phone != null ? phone.trim() : "";
+        return PhoneNumberUtils.normalizeRwanda(phone);
     }
 
     private String resolveEmail(String email, String phone) {
@@ -201,17 +206,13 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthTokensResponse login(LoginRequest request) {
         String identifier = request.resolvedIdentifier();
-        String principal = identifier.contains("@") ? identifier.toLowerCase() : identifier;
+        String principal =
+                PhoneNumberUtils.looksLikeEmail(identifier) ? identifier.toLowerCase() : identifier;
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(principal, request.getPassword()));
 
-        User user = identifier.contains("@")
-                ? userRepository
-                        .findByEmailIgnoreCase(identifier)
-                        .orElseThrow(() -> new BusinessException("Invalid credentials"))
-                : userRepository
-                        .findByPhoneNumber(identifier)
-                        .orElseThrow(() -> new BusinessException("Invalid credentials"));
+        User user = findUserByLoginIdentifier(identifier)
+                .orElseThrow(() -> new BusinessException("Invalid credentials"));
 
         boolean isCitizen = user.getRoles().stream().anyMatch(role -> RoleCodes.CITIZEN.equals(role.getCode()));
 
@@ -260,10 +261,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthTokensResponse verifyOtp(VerifyOtpRequest request) {
-        otpService.verify(OTP_PURPOSE_SIGNUP, request.getPhoneNumber(), request.getOtp());
-        User user = userRepository
-                .findByPhoneNumber(request.getPhoneNumber())
-                .orElseThrow(() -> new BusinessException("Account not found"));
+        String phone = request.resolvedPhoneNumber();
+        verifySignupOtp(request, phone);
+        User user = findUserByPhone(phone).orElseThrow(() -> new BusinessException("Account not found"));
         user.setPhoneVerified(true);
         user.setEmailVerified(true);
         user.setStatus(UserStatus.ACTIVE);
@@ -275,7 +275,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void resendOtp(ResendOtpRequest request) {
-        userRepository.findByPhoneNumber(request.getPhoneNumber()).ifPresent(user -> {
+        findUserByPhone(request.resolvedPhoneNumber()).ifPresent(user -> {
             if (user.getStatus() == UserStatus.PENDING_EMAIL_VERIFICATION) {
                 sendSignupOtp(user);
             }
@@ -373,6 +373,35 @@ public class AuthServiceImpl implements AuthService {
         issueVerificationToken(user, VerificationTokenType.EMAIL_VERIFICATION);
 
         return buildAuthResponse(user);
+    }
+
+    private Optional<User> findUserByLoginIdentifier(String identifier) {
+        if (PhoneNumberUtils.looksLikeEmail(identifier)) {
+            return userRepository.findByEmailIgnoreCase(identifier);
+        }
+        return findUserByPhone(identifier);
+    }
+
+    private Optional<User> findUserByPhone(String phone) {
+        String normalized = PhoneNumberUtils.normalizeRwanda(phone);
+        Optional<User> user = userRepository.findByPhoneNumber(normalized);
+        if (user.isPresent() || normalized.equals(phone.trim())) {
+            return user;
+        }
+        return userRepository.findByPhoneNumber(phone.trim());
+    }
+
+    private void verifySignupOtp(VerifyOtpRequest request, String normalizedPhone) {
+        String rawPhone = request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : normalizedPhone;
+        try {
+            otpService.verify(OTP_PURPOSE_SIGNUP, normalizedPhone, request.getOtp());
+        } catch (BusinessException ex) {
+            if (!rawPhone.equals(normalizedPhone)) {
+                otpService.verify(OTP_PURPOSE_SIGNUP, rawPhone, request.getOtp());
+                return;
+            }
+            throw ex;
+        }
     }
 
     private AuthTokensResponse buildAuthResponse(User user) {

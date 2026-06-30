@@ -19,4 +19,6 @@ public class CreateClaimRequest {
     private String description;
 
     private BigDecimal claimedAmount;
+
+    private java.time.LocalDate incidentDate;
 }

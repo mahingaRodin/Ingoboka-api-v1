@@ -87,6 +87,7 @@ public class ClaimServiceImpl implements ClaimService {
         claim.setClaimType(request.getClaimType());
         claim.setDescription(request.getDescription());
         claim.setClaimedAmount(request.getClaimedAmount());
+        claim.setIncidentDate(request.getIncidentDate());
         claim.setStatus(ClaimStatus.DRAFT);
         claim.setCreatedAt(now);
         claim.setUpdatedAt(now);
@@ -396,6 +397,7 @@ public class ClaimServiceImpl implements ClaimService {
                 .claimType(claim.getClaimType())
                 .description(claim.getDescription())
                 .claimedAmount(claim.getClaimedAmount())
+                .incidentDate(claim.getIncidentDate())
                 .currency("RWF")
                 .policyNumber(policyNumber)
                 .claimantName(claimantName)

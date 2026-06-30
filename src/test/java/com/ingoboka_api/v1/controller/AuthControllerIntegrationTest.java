@@ -31,6 +31,42 @@ class AuthControllerIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void loginAcceptsEmailFieldWhenIdentifierIsSwaggerPlaceholder() throws Exception {
+        post("/api/v1/auth/login", """
+                {"identifier":"email","email":"%s","password":"%s"}
+                """.formatted(platformAdminEmail(), platformAdminPassword()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").exists());
+    }
+
+    @Test
+    void citizenCanLoginWithLocalPhoneFormatAfterVerification() throws Exception {
+        String phone = "+25078" + randomPhoneSuffix();
+        String localPhone = "0" + phone.substring(4);
+        String email = "citizen." + randomPhoneSuffix() + "@test.ingoboka";
+        String nationalId = "119988776655" + randomPhoneSuffix().substring(0, 4);
+        String registerBody =
+                """
+                {"fullName":"Test Citizen","phone":"%s","nationalId":"%s","password":"Citizen@Test123","email":"%s"}
+                """
+                        .formatted(phone, nationalId, email);
+
+        post("/api/v1/auth/register", registerBody).andExpect(status().isCreated());
+
+        String otp = OtpTestSupport.latestOtpFor(otpService, "SIGNUP", phone);
+        post("/api/v1/auth/verify-otp", """
+                {"phone":"%s","otp":"%s"}
+                """.formatted(phone, otp))
+                .andExpect(status().isOk());
+
+        post("/api/v1/auth/login", """
+                {"identifier":"%s","password":"Citizen@Test123"}
+                """.formatted(localPhone))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").exists());
+    }
+
+    @Test
     void citizenRegistrationVerifyOtpAndLogin() throws Exception {
         String phone = "+25078" + randomPhoneSuffix();
         String email = "citizen." + randomPhoneSuffix() + "@test.ingoboka";

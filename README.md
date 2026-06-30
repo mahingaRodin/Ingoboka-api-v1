@@ -149,7 +149,7 @@ Available after `docker compose up` with `DemoDataSeeder` (password for all: **`
 | Partner admin | `eric@demo-insurer.rw` |
 | Claims officer | `claims@demo-insurer.rw` |
 | Agent | `agent@demo-insurer.rw` |
-| Platform admin | Seeded from `SEED_PLATFORM_ADMIN` / `ingoboka.seed.platform-admin.*` in `.env` |
+| Platform admin | `PLATFORM_ADMIN_EMAIL` / `PLATFORM_ADMIN_PASSWORD` in `deploy/.env` (seeded once) |
 
 Demo includes a published **Personal Accident Micro** product (daily/weekly/monthly plans), an active policy, and a sample claim.
 
@@ -162,6 +162,7 @@ Key environment variables (see `deploy/.env` and `application-docker.properties`
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `JWT_SECRET` | JWT signing key (≥256 bits) | **required in prod** |
+| `PLATFORM_ADMIN_EMAIL` / `PLATFORM_ADMIN_PASSWORD` | First-run platform admin seed | see `.env.example` |
 | `OTP_DELIVERY_CHANNEL` | `email` \| `log` \| `sms` | `email` |
 | `MAIL_HOST` / `MAIL_USERNAME` / `MAIL_PASSWORD` | SMTP for OTP & notifications | Gmail-compatible |
 | `SANDBOX_AUTO_APPROVE` | Auto-approve applications in demo | `true` |

@@ -13,12 +13,18 @@ public class CorsConfig {
     @Bean
     CorsFilter corsFilter(@Value("${ingoboka.cors.allowed-origins:*}") String allowedOrigins) {
         CorsConfiguration config = new CorsConfiguration();
-        for (String origin : allowedOrigins.split(",")) {
-            config.addAllowedOriginPattern(origin.trim());
+        boolean isWildcard = "*".equals(allowedOrigins.trim());
+        if (isWildcard) {
+            config.addAllowedOriginPattern("*");
+            config.setAllowCredentials(false);
+        } else {
+            for (String origin : allowedOrigins.split(",")) {
+                config.addAllowedOrigin(origin.trim());
+            }
+            config.setAllowCredentials(true);
         }
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
-        config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

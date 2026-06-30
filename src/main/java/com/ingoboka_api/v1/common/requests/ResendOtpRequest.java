@@ -1,5 +1,9 @@
 package com.ingoboka_api.v1.common.requests;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ingoboka_api.v1.common.util.PhoneNumberUtils;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
@@ -7,5 +11,12 @@ import lombok.Data;
 public class ResendOtpRequest {
 
     @NotBlank
+    @JsonAlias("phone")
+    @Schema(example = "+250780000001")
     private String phoneNumber;
+
+    @JsonIgnore
+    public String resolvedPhoneNumber() {
+        return PhoneNumberUtils.normalizeRwanda(phoneNumber);
+    }
 }

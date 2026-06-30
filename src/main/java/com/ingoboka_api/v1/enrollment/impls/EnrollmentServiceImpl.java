@@ -274,6 +274,15 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     }
 
     private Consent grantConsentForUser(UUID userId, GrantConsentRequest request) {
+        consentRepository
+                .findByUserIdAndConsentTypeAndGrantedTrueAndRevokedAtIsNull(
+                        userId, request.getConsentType())
+                .ifPresent(existing -> {
+                    existing.setGranted(false);
+                    existing.setRevokedAt(Instant.now());
+                    consentRepository.save(existing);
+                });
+
         Instant now = Instant.now();
         Consent consent = new Consent();
         consent.setId(UUID.randomUUID());

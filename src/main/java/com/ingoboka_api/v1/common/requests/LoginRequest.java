@@ -1,34 +1,55 @@
 package com.ingoboka_api.v1.common.requests;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ingoboka_api.v1.common.util.PhoneNumberUtils;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
+@Schema(description = "Login with phone or email plus password")
 public class LoginRequest {
 
-    /** Phone or email — preferred for frontend. */
+  @Schema(
+      description = "Phone number (+250...) or email address",
+      example = "+250780000001")
   private String identifier;
 
-    @JsonAlias("identifier")
-    private String email;
+  @Schema(description = "Email address (alternative to identifier)", example = "user@example.com")
+  private String email;
 
-    @JsonAlias("identifier")
-    private String phone;
+  @Schema(description = "Phone number (alternative to identifier)", example = "+250780000001")
+  private String phone;
 
-    @NotBlank(message = "Password is required")
-    private String password;
+  @NotBlank(message = "Password is required")
+  @Schema(example = "YourPassword@123")
+  private String password;
 
-    public String resolvedIdentifier() {
-        if (identifier != null && !identifier.isBlank()) {
-            return identifier.trim();
-        }
-        if (email != null && !email.isBlank()) {
-            return email.trim();
-        }
-        if (phone != null && !phone.isBlank()) {
-            return phone.trim();
-        }
-        throw new IllegalArgumentException("Phone or email is required");
+  @JsonIgnore
+  public String resolvedIdentifier() {
+    if (isUsableCredential(identifier)) {
+      return normalizeCredential(identifier);
     }
+    if (isUsableCredential(email)) {
+      return normalizeCredential(email);
+    }
+    if (isUsableCredential(phone)) {
+      return normalizeCredential(phone);
+    }
+    throw new IllegalArgumentException("Phone or email is required");
+  }
+
+  private static boolean isUsableCredential(String value) {
+    return value != null
+        && !value.isBlank()
+        && !PhoneNumberUtils.isPlaceholderIdentifier(value);
+  }
+
+  private static String normalizeCredential(String value) {
+    String trimmed = value.trim();
+    if (PhoneNumberUtils.looksLikeEmail(trimmed)) {
+      return trimmed.toLowerCase();
+    }
+    return PhoneNumberUtils.normalizeRwanda(trimmed);
+  }
 }

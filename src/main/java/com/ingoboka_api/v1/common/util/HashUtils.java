@@ -22,4 +22,16 @@ public final class HashUtils {
             throw new IllegalStateException("SHA-256 not available", e);
         }
     }
+    public static String sha256(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            return null;
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(bytes);
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
 }

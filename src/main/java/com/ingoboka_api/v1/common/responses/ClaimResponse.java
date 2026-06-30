@@ -18,6 +18,7 @@ public class ClaimResponse {
     String claimType;
     String description;
     BigDecimal claimedAmount;
+    java.time.LocalDate incidentDate;
     String currency;
     String policyNumber;
     String claimantName;

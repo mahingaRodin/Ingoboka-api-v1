@@ -44,6 +44,9 @@ public class Claim {
     @Column(name = "claimed_amount", precision = 14, scale = 2)
     private BigDecimal claimedAmount;
 
+    @Column(name = "incident_date")
+    private java.time.LocalDate incidentDate;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private ClaimStatus status = ClaimStatus.DRAFT;
