@@ -77,9 +77,10 @@ public abstract class IntegrationTestSupport {
             registry.add(
                     "spring.datasource.password",
                     () -> System.getProperty("integration.jdbc.password", "12345"));
-            ensureRedisContainerStarted();
-            registry.add("spring.data.redis.host", () -> redis.getHost());
-            registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
+            registry.add("spring.data.redis.host",
+                    () -> System.getProperty("integration.redis.host", "localhost"));
+            registry.add("spring.data.redis.port",
+                    () -> Integer.parseInt(System.getProperty("integration.redis.port", "6379")));
             registry.add(
                     "ingoboka.seed.platform-admin.email",
                     () -> System.getProperty("integration.admin.email", "agressive.one04@gmail.com"));

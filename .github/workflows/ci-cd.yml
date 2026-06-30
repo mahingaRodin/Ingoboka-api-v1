@@ -12,6 +12,32 @@ env:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ingoboka
+          POSTGRES_USER: ingoboka
+          POSTGRES_PASSWORD: ingoboka
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ingoboka -d ingoboka"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -26,7 +52,7 @@ jobs:
           cache: maven
 
       - name: Build and test
-        run: ./mvnw clean verify -B -Dintegration=true
+        run: ./mvnw clean verify -B -Dintegration=true -Dintegration.local=true -Dintegration.jdbc.url=jdbc:postgresql://localhost:5432/ingoboka -Dintegration.jdbc.username=ingoboka -Dintegration.jdbc.password=ingoboka
 
       - name: Build Docker image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
