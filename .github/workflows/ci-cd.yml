@@ -12,32 +12,6 @@ env:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: ingoboka
-          POSTGRES_USER: ingoboka
-          POSTGRES_PASSWORD: ingoboka
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ingoboka -d ingoboka"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
 
@@ -51,8 +25,21 @@ jobs:
           distribution: temurin
           cache: maven
 
+      # ---------------------------------------------------------
+      # FIX APPLIED HERE:
+      # Removed -Dintegration.local=true and hardcoded JDBC URLs.
+      # Testcontainers will now dynamically assign ports and URIs.
+      # ---------------------------------------------------------
       - name: Build and test
-        run: ./mvnw clean verify -B -Dintegration=true -Dintegration.local=true -Dintegration.jdbc.url=jdbc:postgresql://localhost:5432/ingoboka -Dintegration.jdbc.username=ingoboka -Dintegration.jdbc.password=ingoboka
+        run: ./mvnw clean verify -B -Dintegration=true
+
+      # Helpful addition: Uploads test reports if the build fails
+      - name: Upload Test Reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
 
       - name: Build Docker image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
