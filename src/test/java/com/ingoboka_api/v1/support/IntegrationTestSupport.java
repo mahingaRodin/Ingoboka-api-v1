@@ -96,6 +96,8 @@ public abstract class IntegrationTestSupport {
         registry.add("spring.datasource.password", () -> postgres.getPassword());
         registry.add("spring.data.redis.host", () -> redis.getHost());
         registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
+        registry.add("ingoboka.seed.platform-admin.email", () -> "platform-admin@test.ingoboka");
+        registry.add("ingoboka.seed.platform-admin.password", () -> "Admin@Test123");
     }
 
     private static synchronized void ensureRedisContainerStarted() {
