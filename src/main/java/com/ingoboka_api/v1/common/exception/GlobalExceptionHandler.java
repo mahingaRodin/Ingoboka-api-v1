@@ -1,9 +1,14 @@
 package com.ingoboka_api.v1.common.exception;
 
 import com.ingoboka_api.v1.common.responses.ApiResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.DisabledException;
@@ -13,6 +18,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 @Slf4j
 @RestControllerAdvice
@@ -60,10 +66,68 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(message, "ACCESS_DENIED"));
     }
 
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        String message = "Request conflicts with existing data";
+        String detail = ex.getMostSpecificCause().getMessage();
+        if (detail != null && detail.contains("idx_consents_active_user_type")) {
+            message = "An active consent of this type already exists";
+        }
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(message));
+    }
+
+    /**
+     * Client closed the connection (Swagger assets, slow networks). Not an app bug —
+     * do not try to write a JSON body onto a response that already has another Content-Type.
+     */
+    @ExceptionHandler({
+        ClientAbortException.class,
+        AsyncRequestNotUsableException.class
+    })
+    public ResponseEntity<Void> handleClientGone(Exception ex) {
+        log.debug("Client aborted request: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT).build();
+    }
+
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<Void> handleIoException(IOException ex, HttpServletRequest request) {
+        if (isClientAbort(ex)) {
+            log.debug("Client aborted request {}: {}", request.getRequestURI(), ex.getMessage());
+            return ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT).build();
+        }
+        log.error("Unhandled IOException on {}", request.getRequestURI(), ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .build();
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception ex) {
+        if (isClientAbort(ex)) {
+            log.debug("Client aborted request: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT).build();
+        }
         log.error("Unhandled exception", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ApiResponse.error("An unexpected error occurred"));
+    }
+
+    private static boolean isClientAbort(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof ClientAbortException
+                    || current instanceof AsyncRequestNotUsableException) {
+                return true;
+            }
+            String name = current.getClass().getName();
+            if (name.contains("ClientAbortException")
+                    || name.contains("AsyncRequestNotUsableException")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

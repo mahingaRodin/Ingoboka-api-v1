@@ -131,13 +131,15 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
     @Transactional
     public ConsentResponse grantConsent(GrantConsentRequest request, String ipAddress) {
         IngobokaUserDetails user = SecurityUtils.currentUser();
+        // Flush revoke before insert — Hibernate otherwise inserts first and hits
+        // idx_consents_active_user_type (one active consent per user + type).
         consentRepository
                 .findByUserIdAndConsentTypeAndGrantedTrueAndRevokedAtIsNull(
                         user.getUserId(), request.getConsentType())
                 .ifPresent(existing -> {
                     existing.setGranted(false);
                     existing.setRevokedAt(Instant.now());
-                    consentRepository.save(existing);
+                    consentRepository.saveAndFlush(existing);
                 });
 
         Instant now = Instant.now();

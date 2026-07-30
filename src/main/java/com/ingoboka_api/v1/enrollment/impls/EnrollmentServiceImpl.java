@@ -274,25 +274,22 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     }
 
     private Consent grantConsentForUser(UUID userId, GrantConsentRequest request) {
-        consentRepository
+        // Reuse an already-active consent (unique index idx_consents_active_user_type).
+        return consentRepository
                 .findByUserIdAndConsentTypeAndGrantedTrueAndRevokedAtIsNull(
                         userId, request.getConsentType())
-                .ifPresent(existing -> {
-                    existing.setGranted(false);
-                    existing.setRevokedAt(Instant.now());
-                    consentRepository.save(existing);
+                .orElseGet(() -> {
+                    Instant now = Instant.now();
+                    Consent consent = new Consent();
+                    consent.setId(UUID.randomUUID());
+                    consent.setUserId(userId);
+                    consent.setConsentType(request.getConsentType());
+                    consent.setVersion(request.getVersion());
+                    consent.setGranted(true);
+                    consent.setGrantedAt(now);
+                    consent.setCreatedAt(now);
+                    return consentRepository.save(consent);
                 });
-
-        Instant now = Instant.now();
-        Consent consent = new Consent();
-        consent.setId(UUID.randomUUID());
-        consent.setUserId(userId);
-        consent.setConsentType(request.getConsentType());
-        consent.setVersion(request.getVersion());
-        consent.setGranted(true);
-        consent.setGrantedAt(now);
-        consent.setCreatedAt(now);
-        return consentRepository.save(consent);
     }
 
     @Override
