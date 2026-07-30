@@ -12,6 +12,9 @@ public interface BillingService {
 
     PaymentResponse initiatePayment(InitiatePaymentRequest request);
 
+    /** Used by USSD / agent channels — no SecurityContext required. */
+    PaymentResponse initiatePaymentForCitizen(UUID citizenProfileId, UUID policyId, String provider, String payerPhone);
+
     PaymentStatusResponse getPaymentStatus(UUID paymentId);
 
     PaymentResponse processWebhook(String provider, PaymentWebhookRequest request);

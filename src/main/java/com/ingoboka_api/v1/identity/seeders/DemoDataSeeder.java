@@ -145,6 +145,9 @@ public class DemoDataSeeder implements ApplicationRunner {
         saveProductFaq(product.getId(), now);
         saveProductDocument(product.getId(), now);
 
+        InsuranceProduct hospitalCash = saveHospitalCashProduct(org.getId(), now);
+        saveHospitalCashPlan(hospitalCash.getId(), now);
+
         PolicyApplication application = saveApplication(profile, org.getId(), monthlyPlan, consent.getId(), now);
         Policy policy = savePolicy(application, profile, monthlyPlan, now);
         saveClaim(policy, profile, org.getId(), now);
@@ -260,7 +263,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         product.setOrganizationId(orgId);
         product.setCode("PA-MICRO");
         product.setName("Personal Accident Micro");
-        product.setDescription("Affordable accident protection for informal workers.");
+        product.setDescription("Affordable accident protection for informal workers. DEMO/SANDBOX only.");
         product.setCategory("PERSONAL_ACCIDENT");
         product.setStatus(ProductStatus.PUBLISHED);
         product.setHeroImageKey(DEMO_HERO_IMAGE_URL);
@@ -268,6 +271,60 @@ public class DemoDataSeeder implements ApplicationRunner {
         product.setCreatedAt(now);
         product.setUpdatedAt(now);
         return productRepository.save(product);
+    }
+
+    /** DEMO/SANDBOX Hospital Cash — fixed daily benefit, not commercial insurance. */
+    private InsuranceProduct saveHospitalCashProduct(UUID orgId, Instant now) {
+        InsuranceProduct product = new InsuranceProduct();
+        product.setId(UUID.randomUUID());
+        product.setOrganizationId(orgId);
+        product.setCode("HC-DEMO");
+        product.setName("Hospital Cash Protection");
+        product.setDescription(
+                "DEMO/SANDBOX: 2,000 RWF/day hospital cash, max 30 days, 500 RWF/week. Not commercial insurance.");
+        product.setCategory("HOSPITAL_CASH");
+        product.setStatus(ProductStatus.PUBLISHED);
+        product.setHeroImageKey(DEMO_HERO_IMAGE_URL);
+        product.setPublishedAt(now);
+        product.setCreatedAt(now);
+        product.setUpdatedAt(now);
+        return productRepository.save(product);
+    }
+
+    private ProductPlan saveHospitalCashPlan(UUID productId, Instant now) {
+        ProductPlan plan = new ProductPlan();
+        plan.setId(UUID.randomUUID());
+        plan.setProductId(productId);
+        plan.setCode("HC-WEEKLY");
+        plan.setName("Weekly 500 RWF");
+        plan.setDescription("DEMO: 500 RWF/week. Benefit 2,000 RWF per eligible hospital day, max 30 days.");
+        plan.setPremiumAmount(BigDecimal.valueOf(500));
+        plan.setPremiumFrequency(PremiumFrequency.WEEKLY);
+        plan.setWaitingPeriodDays(14);
+        plan.setStatus(ProductStatus.PUBLISHED);
+        plan.setCreatedAt(now);
+        plan.setUpdatedAt(now);
+        planRepository.save(plan);
+
+        ProductBenefit benefit = new ProductBenefit();
+        benefit.setId(UUID.randomUUID());
+        benefit.setPlanId(plan.getId());
+        benefit.setTitle("Daily hospital cash");
+        benefit.setDescription("2,000 RWF per eligible hospitalization day, maximum 30 days (DEMO).");
+        benefit.setCoverageLimit(BigDecimal.valueOf(60_000));
+        benefit.setSortOrder(0);
+        benefit.setCreatedAt(now);
+        benefitRepository.save(benefit);
+
+        ProductExclusion exclusion = new ProductExclusion();
+        exclusion.setId(UUID.randomUUID());
+        exclusion.setPlanId(plan.getId());
+        exclusion.setTitle("Pre-existing conditions");
+        exclusion.setDescription("Conditions diagnosed before waiting period ends.");
+        exclusion.setSortOrder(0);
+        exclusion.setCreatedAt(now);
+        exclusionRepository.save(exclusion);
+        return plan;
     }
 
     private ProductPlan savePlan(

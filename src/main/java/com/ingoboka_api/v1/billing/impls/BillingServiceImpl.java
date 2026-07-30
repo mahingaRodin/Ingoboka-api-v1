@@ -71,7 +71,6 @@ public class BillingServiceImpl implements BillingService {
     public PaymentResponse initiatePayment(InitiatePaymentRequest request) {
         CitizenProfile profile = requireMyProfile();
         UUID policyId = resolvePolicyId(request, profile);
-
         Policy policy = policyService.requirePolicyForPayment(policyId, profile.getId());
 
         if (paymentRepository.existsByPolicyIdAndStatus(policy.getId(), PaymentStatus.PENDING)) {
@@ -106,11 +105,48 @@ public class BillingServiceImpl implements BillingService {
         payment.setIdempotencyKey(idempotencyKey);
         payment.setInitiatedAt(now);
 
-        PaymentInitiationResult initiation =
-                adapter.initiate(payment, request, resolveUserPhone(profile));
+        String payerPhone =
+                request.getPayerPhone() != null ? request.getPayerPhone() : resolveUserPhone(profile);
+        PaymentInitiationResult initiation = adapter.initiate(payment, request, payerPhone);
         payment.setProviderReference(initiation.getProviderReference());
         paymentRepository.save(payment);
 
+        return toResponse(payment, initiation);
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponse initiatePaymentForCitizen(
+            UUID citizenProfileId, UUID policyId, String provider, String payerPhone) {
+        InitiatePaymentRequest request = new InitiatePaymentRequest();
+        request.setPolicyId(policyId);
+        request.setProvider(provider != null ? provider : SandboxPaymentAdapter.CODE);
+        request.setPayerPhone(payerPhone);
+        request.setIdempotencyKey("ussd-" + UUID.randomUUID());
+
+        Policy policy = policyService.requirePolicyForPayment(policyId, citizenProfileId);
+        if (paymentRepository.existsByPolicyIdAndStatus(policy.getId(), PaymentStatus.PENDING)) {
+            throw new BusinessException("A payment is already pending for this policy");
+        }
+
+        Instant now = Instant.now();
+        String providerCode = request.getProvider();
+        PaymentProviderAdapter adapter = paymentProviderRegistry.require(providerCode);
+
+        Payment payment = new Payment();
+        payment.setId(UUID.randomUUID());
+        payment.setOrganizationId(policy.getOrganizationId());
+        payment.setPolicyId(policy.getId());
+        payment.setCitizenProfileId(citizenProfileId);
+        payment.setAmount(policy.getPremiumAmount());
+        payment.setStatus(PaymentStatus.PENDING);
+        payment.setProvider(providerCode);
+        payment.setIdempotencyKey(request.getIdempotencyKey());
+        payment.setInitiatedAt(now);
+
+        PaymentInitiationResult initiation = adapter.initiate(payment, request, payerPhone);
+        payment.setProviderReference(initiation.getProviderReference());
+        paymentRepository.save(payment);
         return toResponse(payment, initiation);
     }
 

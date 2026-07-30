@@ -153,6 +153,14 @@ Available after `docker compose up` with `DemoDataSeeder` (password for all: **`
 
 Demo includes a published **Personal Accident Micro** product (daily/weekly/monthly plans), an active policy, and a sample claim.
 
+On a **fresh** demo seed, **Hospital Cash Protection** (`HC-DEMO`) is also published (DEMO/SANDBOX: 500 RWF/week, 2,000 RWF/day text).
+
+### USSD (*477# — Africa's Talking sandbox)
+
+No login. MSISDN from the network. Register family/business once (SMS confirmation). Menus: services, my policies, pay premium, help.
+
+See [docs/ussd-africas-talking.md](docs/ussd-africas-talking.md). Callback: `POST /api/v1/ussd/callback`.
+
 ---
 
 ## Configuration
