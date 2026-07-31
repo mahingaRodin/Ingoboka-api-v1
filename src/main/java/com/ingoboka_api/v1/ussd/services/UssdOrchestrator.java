@@ -57,19 +57,20 @@ public class UssdOrchestrator {
 
         if (!StringUtils.hasText(text)) {
             session.setStep("MAIN");
-            String response = UssdMessages.mainMenu();
+            String response = UssdMessages.mainMenu(session.getLanguage());
             sessionStore.save(session);
             return response;
         }
 
-        if ("0".equals(input) && !"MAIN".equals(session.getStep())) {
+        if ("0".equals(input) && !"MAIN".equals(session.getStep()) && !"LANGUAGE".equals(session.getStep())) {
             session.setStep("MAIN");
             sessionStore.save(session);
-            return UssdMessages.mainMenu();
+            return UssdMessages.mainMenu(session.getLanguage());
         }
 
         String response = switch (session.getStep()) {
             case "MAIN" -> handleMain(session, input);
+            case "LANGUAGE" -> handleLanguage(session, input);
             case "REGISTER_TYPE" -> handleRegisterType(session, input);
             case "REGISTER_NAME" -> handleRegisterName(session, input);
             case "REGISTER_BUSINESS" -> handleRegisterBusiness(session, input);
@@ -80,7 +81,7 @@ public class UssdOrchestrator {
             case "PAY" -> handlePay(session, input);
             default -> {
                 session.setStep("MAIN");
-                yield UssdMessages.mainMenu();
+                yield UssdMessages.mainMenu(session.getLanguage());
             }
         };
 
@@ -90,6 +91,10 @@ public class UssdOrchestrator {
             sessionStore.save(session);
         }
         return response;
+    }
+
+    private String lang(UssdSession session) {
+        return session.getLanguage();
     }
 
     private String handleMain(UssdSession session, String input) {
@@ -107,60 +112,78 @@ public class UssdOrchestrator {
                 yield listPayOptions(session);
             }
             case "4" -> startRegistration(session);
-            case "5" -> UssdMessages.help();
-            default -> UssdMessages.invalidOption();
+            case "5" -> UssdMessages.help(lang(session));
+            case "6" -> {
+                session.setStep("LANGUAGE");
+                yield UssdMessages.languageMenu();
+            }
+            default -> UssdMessages.invalidOption(lang(session));
         };
+    }
+
+    private String handleLanguage(UssdSession session, String input) {
+        if ("1".equals(input)) {
+            session.setLanguage("rw");
+            session.setStep("MAIN");
+            return UssdMessages.mainMenu("rw");
+        }
+        if ("2".equals(input)) {
+            session.setLanguage("en");
+            session.setStep("MAIN");
+            return UssdMessages.mainMenu("en");
+        }
+        return UssdMessages.languageMenu();
     }
 
     private String startRegistration(UssdSession session) {
         Optional<UssdRegistration> existing = registrationService.findByPhone(session.getPhoneNumber());
         if (existing.isPresent()) {
             UssdRegistration reg = existing.get();
-            return UssdMessages.alreadyRegistered(reg.getReferenceCode(), reg.getFullName());
+            return UssdMessages.alreadyRegistered(lang(session), reg.getReferenceCode(), reg.getFullName());
         }
         session.setStep("REGISTER_TYPE");
-        return UssdMessages.registrationTypePrompt();
+        return UssdMessages.registrationTypePrompt(lang(session));
     }
 
     private String handleRegisterType(UssdSession session, String input) {
         if ("1".equals(input)) {
             session.put("regType", UssdRegistrationType.FAMILY.name());
             session.setStep("REGISTER_NAME");
-            return UssdMessages.askFullName();
+            return UssdMessages.askFullName(lang(session));
         }
         if ("2".equals(input)) {
             session.put("regType", UssdRegistrationType.BUSINESS.name());
             session.setStep("REGISTER_NAME");
-            return UssdMessages.askFullName();
+            return UssdMessages.askFullName(lang(session));
         }
-        return UssdMessages.invalidOption();
+        return UssdMessages.invalidOption(lang(session));
     }
 
     private String handleRegisterName(UssdSession session, String input) {
         if (!StringUtils.hasText(input) || input.length() < 2) {
-            return UssdMessages.askFullName();
+            return UssdMessages.askFullName(lang(session));
         }
         session.put("fullName", input.trim());
         if (UssdRegistrationType.BUSINESS.name().equals(session.get("regType"))) {
             session.setStep("REGISTER_BUSINESS");
-            return UssdMessages.askBusinessName();
+            return UssdMessages.askBusinessName(lang(session));
         }
         session.setStep("REGISTER_DISTRICT");
-        return UssdMessages.askDistrict();
+        return UssdMessages.askDistrict(lang(session));
     }
 
     private String handleRegisterBusiness(UssdSession session, String input) {
         if (!StringUtils.hasText(input) || input.length() < 2) {
-            return UssdMessages.askBusinessName();
+            return UssdMessages.askBusinessName(lang(session));
         }
         session.put("businessName", input.trim());
         session.setStep("REGISTER_DISTRICT");
-        return UssdMessages.askDistrict();
+        return UssdMessages.askDistrict(lang(session));
     }
 
     private String handleRegisterDistrict(UssdSession session, String input) {
         if (!StringUtils.hasText(input) || input.length() < 2) {
-            return UssdMessages.askDistrict();
+            return UssdMessages.askDistrict(lang(session));
         }
         try {
             UssdRegistrationType type = UssdRegistrationType.valueOf(session.get("regType"));
@@ -174,7 +197,8 @@ public class UssdOrchestrator {
             String display = type == UssdRegistrationType.BUSINESS && session.get("businessName") != null
                     ? session.get("businessName")
                     : session.get("fullName");
-            return UssdMessages.registrationSuccess(reg.getReferenceCode(), display, type.name());
+            return UssdMessages.registrationSuccess(
+                    lang(session), reg.getReferenceCode(), display, type.name());
         } catch (BusinessException ex) {
             return "END " + ex.getMessage();
         }
@@ -184,23 +208,23 @@ public class UssdOrchestrator {
         List<InsuranceProduct> products =
                 productRepository.findByStatusOrderByPublishedAtDesc(ProductStatus.PUBLISHED);
         if (products.isEmpty()) {
-            return UssdMessages.noServices();
+            return UssdMessages.noServices(lang(session));
         }
-        StringBuilder sb = new StringBuilder("CON Serivise / Services (DEMO):\n");
+        StringBuilder sb = new StringBuilder(UssdMessages.servicesHeader(lang(session)));
         int limit = Math.min(products.size(), 5);
         for (int i = 0; i < limit; i++) {
             InsuranceProduct p = products.get(i);
             session.put("product:" + (i + 1), p.getId().toString());
             sb.append(i + 1).append(". ").append(shorten(p.getName(), 28)).append("\n");
         }
-        sb.append("0. Subira");
+        sb.append(UssdMessages.backLabel(lang(session)));
         return sb.toString();
     }
 
     private String handleServices(UssdSession session, String input) {
         String productId = session.get("product:" + input);
         if (productId == null) {
-            return UssdMessages.invalidOption();
+            return UssdMessages.invalidOption(lang(session));
         }
         session.put("productId", productId);
         session.setStep("PLANS");
@@ -210,9 +234,9 @@ public class UssdOrchestrator {
     private String listPlans(UssdSession session, UUID productId) {
         List<ProductPlan> plans = planRepository.findByProductIdAndStatus(productId, ProductStatus.PUBLISHED);
         if (plans.isEmpty()) {
-            return "END Nta plans. No plans for this product.";
+            return UssdMessages.noPlans(lang(session));
         }
-        StringBuilder sb = new StringBuilder("CON Hitamo plan / Choose plan:\n");
+        StringBuilder sb = new StringBuilder(UssdMessages.plansHeader(lang(session)));
         int limit = Math.min(plans.size(), 5);
         for (int i = 0; i < limit; i++) {
             ProductPlan plan = plans.get(i);
@@ -226,18 +250,18 @@ public class UssdOrchestrator {
                     .append(plan.getPremiumFrequency().name().charAt(0))
                     .append("\n");
         }
-        sb.append("0. Subira");
+        sb.append(UssdMessages.backLabel(lang(session)));
         return sb.toString();
     }
 
     private String handlePlans(UssdSession session, String input) {
         String planId = session.get("plan:" + input);
         if (planId == null) {
-            return UssdMessages.invalidOption();
+            return UssdMessages.invalidOption(lang(session));
         }
         if (!registrationService.isRegistered(session.getPhoneNumber())
                 && userRepository.findByPhoneNumber(session.getPhoneNumber()).isEmpty()) {
-            return UssdMessages.mustRegister();
+            return UssdMessages.mustRegister(lang(session));
         }
         try {
             ApplicationResponse app = enrollmentService.createAgentAssistedApplication(
@@ -251,8 +275,11 @@ public class UssdOrchestrator {
                         .orElse(productName);
             }
             return UssdMessages.enrollSuccess(
+                    lang(session),
                     shorten(productName, 24),
-                    app.getApplicationReference() != null ? app.getApplicationReference() : app.getId().toString());
+                    app.getApplicationReference() != null
+                            ? app.getApplicationReference()
+                            : app.getId().toString());
         } catch (BusinessException ex) {
             return "END " + shorten(ex.getMessage(), 120);
         }
@@ -261,13 +288,13 @@ public class UssdOrchestrator {
     private String listPolicies(UssdSession session) {
         Optional<CitizenProfile> profile = findProfile(session.getPhoneNumber());
         if (profile.isEmpty()) {
-            return UssdMessages.mustRegister();
+            return UssdMessages.mustRegister(lang(session));
         }
         List<Policy> policies = policyRepository.findByCitizenProfileIdOrderByCreatedAtDesc(profile.get().getId());
         if (policies.isEmpty()) {
-            return UssdMessages.noPolicies();
+            return UssdMessages.noPolicies(lang(session));
         }
-        StringBuilder sb = new StringBuilder("END Ubwishingizi / Policies:\n");
+        StringBuilder sb = new StringBuilder(UssdMessages.policiesHeader(lang(session)));
         int limit = Math.min(policies.size(), 4);
         for (int i = 0; i < limit; i++) {
             Policy p = policies.get(i);
@@ -288,13 +315,13 @@ public class UssdOrchestrator {
     private String listPayOptions(UssdSession session) {
         Optional<CitizenProfile> profile = findProfile(session.getPhoneNumber());
         if (profile.isEmpty()) {
-            return UssdMessages.mustRegister();
+            return UssdMessages.mustRegister(lang(session));
         }
         List<Policy> policies = policyRepository.findByCitizenProfileIdOrderByCreatedAtDesc(profile.get().getId());
         if (policies.isEmpty()) {
-            return UssdMessages.noPremiumDue();
+            return UssdMessages.noPremiumDue(lang(session));
         }
-        StringBuilder sb = new StringBuilder("CON Ishyura / Pay (SANDBOX):\n");
+        StringBuilder sb = new StringBuilder(UssdMessages.payHeader(lang(session)));
         int limit = Math.min(policies.size(), 5);
         for (int i = 0; i < limit; i++) {
             Policy p = policies.get(i);
@@ -306,18 +333,18 @@ public class UssdOrchestrator {
                     .append(p.getPremiumAmount().toPlainString())
                     .append("RWF\n");
         }
-        sb.append("0. Subira");
+        sb.append(UssdMessages.backLabel(lang(session)));
         return sb.toString();
     }
 
     private String handlePay(UssdSession session, String input) {
         String policyId = session.get("pay:" + input);
         if (policyId == null) {
-            return UssdMessages.invalidOption();
+            return UssdMessages.invalidOption(lang(session));
         }
         Optional<CitizenProfile> profile = findProfile(session.getPhoneNumber());
         if (profile.isEmpty()) {
-            return UssdMessages.mustRegister();
+            return UssdMessages.mustRegister(lang(session));
         }
         try {
             PaymentResponse payment = billingService.initiatePaymentForCitizen(
@@ -326,6 +353,7 @@ public class UssdOrchestrator {
                     SandboxPaymentAdapter.CODE,
                     session.getPhoneNumber());
             return UssdMessages.paymentInitiated(
+                    lang(session),
                     payment.getAmount() != null ? payment.getAmount().toPlainString() : "0",
                     payment.getProviderReference() != null
                             ? payment.getProviderReference()

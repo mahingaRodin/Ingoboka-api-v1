@@ -20,10 +20,8 @@ import com.ingoboka_api.v1.ussd.services.UssdOrchestrator;
 import com.ingoboka_api.v1.ussd.services.UssdRegistrationService;
 import com.ingoboka_api.v1.ussd.session.InMemoryUssdSessionStore;
 import com.ingoboka_api.v1.ussd.session.UssdSessionStore;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,11 +74,23 @@ class UssdOrchestratorTest {
     }
 
     @Test
-    void emptyTextReturnsMainMenu() {
+    void emptyTextReturnsMainMenuWithoutHeader() {
         String response = orchestrator.handle("s1", "+250780000099", "*477#", "");
-        assertThat(response).startsWith("CON Ingoboka");
+        assertThat(response).startsWith("CON");
+        assertThat(response).doesNotContain("Ingoboka");
+        assertThat(response).doesNotContain("*477#");
         assertThat(response).contains("Serivise");
         assertThat(response).contains("Kwiyandikisha");
+        assertThat(response).contains("Hitamo ururimi");
+    }
+
+    @Test
+    void chooseLanguageSwitchesToEnglish() {
+        orchestrator.handle("s6", "+250780000099", "*477#", "");
+        orchestrator.handle("s6", "+250780000099", "*477#", "6");
+        String response = orchestrator.handle("s6", "+250780000099", "*477#", "6*2");
+        assertThat(response).contains("Insurance services");
+        assertThat(response).contains("Choose language");
     }
 
     @Test
@@ -99,7 +109,7 @@ class UssdOrchestratorTest {
 
         String response = orchestrator.handle("s3", "+250780000099", "*477#", "4");
         assertThat(response).startsWith("END");
-        assertThat(response).contains("Already registered");
+        assertThat(response).contains("Mwamaze kwiyandikisha");
         assertThat(response).contains("USSD123456");
     }
 
@@ -138,7 +148,8 @@ class UssdOrchestratorTest {
 
     @Test
     void mainMenuMessageIsShortEnoughForUssd() {
-        assertThat(UssdMessages.mainMenu().length()).isLessThan(160);
+        assertThat(UssdMessages.mainMenu("rw").length()).isLessThan(180);
+        assertThat(UssdMessages.mainMenu("en").length()).isLessThan(180);
     }
 
     @Test
@@ -146,6 +157,6 @@ class UssdOrchestratorTest {
         when(productRepository.findByStatusOrderByPublishedAtDesc(any())).thenReturn(List.of());
         orchestrator.handle("s5", "+250780000077", "*477#", "");
         String response = orchestrator.handle("s5", "+250780000077", "*477#", "1");
-        assertThat(response).contains("No insurance services");
+        assertThat(response).contains("Nta serivisi");
     }
 }

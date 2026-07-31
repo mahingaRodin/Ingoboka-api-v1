@@ -82,7 +82,36 @@ curl -s -X POST "http://localhost:8085/api/v1/ussd/simulate" \
   -d "sessionId=demo1&phoneNumber=+250780000099&text=4*1*Aline%20Uwase*Gasabo"
 ```
 
-SMS body is logged when `MTN_BULK_SMS_ENABLED=false` (`SMS [+250...]: ...` in API logs).
+### SMS to the handset (not log-only)
+
+By default SMS is **logged only** (`SMS [+250...]: ...` in API logs) because no SMS provider is enabled.
+
+To deliver registration SMS to the phone via **Africa's Talking** (same account as USSD):
+
+1. In AT dashboard → **SMS** → enable sandbox (or live app).
+2. **Sandbox only:** whitelist the test MSISDN under SMS → Sandbox → Phone Numbers.
+3. On the server `deploy/.env`:
+
+```env
+AFRICASTALKING_SMS_ENABLED=true
+AFRICASTALKING_USERNAME=sandbox
+AFRICASTALKING_API_KEY=atsk_...
+AFRICASTALKING_SMS_API_URL=https://api.sandbox.africastalking.com/version1/messaging
+MTN_BULK_SMS_ENABLED=false
+```
+
+4. Redeploy (`docker compose up -d --force-recreate api`) and register again — logs should show `Africa's Talking SMS queued to +250...`.
+
+Live traffic needs a live AT app username, live API key, and
+`AFRICASTALKING_SMS_API_URL=https://api.africastalking.com/version1/messaging`
+(plus any approved sender ID in `AFRICASTALKING_SMS_FROM`).
+
+Alternative: `MTN_BULK_SMS_ENABLED=true` with MTN bulk credentials (keep AT SMS disabled).
+
+### Language (Kinyarwanda / English)
+
+Menus are a **curated bilingual catalog** (`UssdMessages`) — option **6. Choose language / Hitamo ururimi**.
+Google Translate is intentionally not called per USSD request (latency, cost, character limits, and flaky networks on feature phones). Edit the catalog when copy changes.
 
 ## Demo product
 

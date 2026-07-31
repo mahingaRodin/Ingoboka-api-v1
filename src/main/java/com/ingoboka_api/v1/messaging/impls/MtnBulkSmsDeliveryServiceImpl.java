@@ -5,7 +5,7 @@ import com.ingoboka_api.v1.messaging.services.SmsDeliveryService;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -14,7 +14,9 @@ import org.springframework.web.client.RestClient;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "ingoboka.sms.mtn-bulk.enabled", havingValue = "true")
+@ConditionalOnExpression(
+        "'${ingoboka.sms.mtn-bulk.enabled:false}' == 'true'"
+                + " && '${ingoboka.sms.africastalking.enabled:false}' != 'true'")
 public class MtnBulkSmsDeliveryServiceImpl implements SmsDeliveryService {
 
     private final MtnBulkSmsProperties properties;

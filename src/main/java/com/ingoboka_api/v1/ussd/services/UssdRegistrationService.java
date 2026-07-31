@@ -99,6 +99,7 @@ public class UssdRegistrationService {
         smsDeliveryService.send(
                 phone,
                 UssdMessages.smsRegistrationBody(
+                        language,
                         displayName,
                         type.name(),
                         district != null ? district.trim() : "-",
