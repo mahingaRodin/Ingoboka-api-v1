@@ -390,6 +390,6 @@ public class UssdOrchestrator {
         if (value == null) {
             return "";
         }
-        return value.length() <= max ? value : value.substring(0, max - 1) + "…";
+        return value.length() <= max ? value : value.substring(0, max - 1) + "...";
     }
 }

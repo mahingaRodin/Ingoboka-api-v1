@@ -76,7 +76,7 @@ class UssdOrchestratorTest {
     @Test
     void emptyTextReturnsMainMenuWithoutHeader() {
         String response = orchestrator.handle("s1", "+250780000099", "*477#", "");
-        assertThat(response).startsWith("CON");
+        assertThat(response).startsWith("CON ");
         assertThat(response).doesNotContain("Ingoboka");
         assertThat(response).doesNotContain("*477#");
         assertThat(response).contains("Serivise");

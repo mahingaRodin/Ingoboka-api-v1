@@ -67,7 +67,21 @@ public class UssdGatewayController {
                 phoneNumber,
                 code,
                 text);
-        return ussdOrchestrator.handle(sessionId, phoneNumber, code, text != null ? text : "");
+        try {
+            String response =
+                    ussdOrchestrator.handle(sessionId, phoneNumber, code, text != null ? text : "");
+            if (!StringUtils.hasText(response)
+                    || !(response.startsWith("CON") || response.startsWith("END"))) {
+                log.error("Invalid USSD response (must start with CON/END): {}", response);
+                return "END Temporary error. Dial again.";
+            }
+            log.info("USSD response session={} body={}", sessionId, response.replace('\n', '|'));
+            return response;
+        } catch (Exception ex) {
+            // Never return JSON to Africa's Talking — phone shows "technical problems".
+            log.error("USSD handler failed session={}: {}", sessionId, ex.getMessage(), ex);
+            return "END Temporary error. Dial again.";
+        }
     }
 
     /** Local simulator — same contract as AT, easier for Postman demos. */

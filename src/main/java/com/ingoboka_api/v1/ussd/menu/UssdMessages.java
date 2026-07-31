@@ -3,8 +3,8 @@ package com.ingoboka_api.v1.ussd.menu;
 /**
  * Curated USSD strings (Kinyarwanda / English).
  *
- * <p>USSD must stay short and offline-safe — do not call Google Translate per request
- * (latency, cost, and flaky network). Edit this catalog when copy changes.
+ * <p>Keep ASCII-safe and short. Telcos reject special characters; AT requires responses
+ * to start with {@code CON } or {@code END } (no leading whitespace).
  */
 public final class UssdMessages {
 
@@ -18,47 +18,37 @@ public final class UssdMessages {
     }
 
     public static String languageMenu() {
-        return """
-                CON Hitamo ururimi
-                Choose language:
-                1. Ikinyarwanda
-                2. English""";
+        return "CON Hitamo ururimi / Choose language:\n"
+                + "1. Ikinyarwanda\n"
+                + "2. English";
     }
 
     public static String mainMenu(String language) {
         if (isKinyarwanda(language)) {
-            return """
-                    CON
-                    1. Serivise z'ubwishingizi
-                    2. Ubwishingizi bwange
-                    3. Ishyura ubwishingizi
-                    4. Kwiyandikisha
-                    5. Saba ubufasha
-                    6. Hitamo ururimi""";
+            return "CON 1. Serivise z ubwishingizi\n"
+                    + "2. Ubwishingizi bwange\n"
+                    + "3. Ishyura ubwishingizi\n"
+                    + "4. Kwiyandikisha\n"
+                    + "5. Saba ubufasha\n"
+                    + "6. Hitamo ururimi";
         }
-        return """
-                CON
-                1. Insurance services
-                2. My policies
-                3. Pay premium
-                4. Register
-                5. Help
-                6. Choose language""";
+        return "CON 1. Insurance services\n"
+                + "2. My policies\n"
+                + "3. Pay premium\n"
+                + "4. Register\n"
+                + "5. Help\n"
+                + "6. Choose language";
     }
 
     public static String help(String language) {
         if (isKinyarwanda(language)) {
-            return """
-                    END Ubufasha
-                    Kanda kode ya USSD ongera.
-                    DEMO/SANDBOX — si ubwishingizi bwemewe.
-                    Support: agressive.one04@gmail.com""";
+            return "END Ubufasha\n"
+                    + "Kanda kode ya USSD ongera.\n"
+                    + "DEMO/SANDBOX - si ubwishingizi bwemewe.";
         }
-        return """
-                END Help
-                Dial the USSD code again anytime.
-                DEMO/SANDBOX — not commercial insurance.
-                Support: agressive.one04@gmail.com""";
+        return "END Help\n"
+                + "Dial the USSD code again anytime.\n"
+                + "DEMO/SANDBOX - not commercial insurance.";
     }
 
     public static String invalidOption(String language) {
@@ -77,17 +67,9 @@ public final class UssdMessages {
 
     public static String registrationTypePrompt(String language) {
         if (isKinyarwanda(language)) {
-            return """
-                    CON Hitamo ubwoko:
-                    1. Umuryango
-                    2. Ubucuruzi
-                    0. Subira""";
+            return "CON Hitamo ubwoko:\n1. Umuryango\n2. Ubucuruzi\n0. Subira";
         }
-        return """
-                CON Choose type:
-                1. Family
-                2. Business
-                0. Back""";
+        return "CON Choose type:\n1. Family\n2. Business\n0. Back";
     }
 
     public static String askFullName(String language) {
@@ -99,7 +81,7 @@ public final class UssdMessages {
 
     public static String askBusinessName(String language) {
         if (isKinyarwanda(language)) {
-            return "CON Andika izina ry'ubucuruzi:";
+            return "CON Andika izina ry ubucuruzi:";
         }
         return "CON Enter business name:";
     }
@@ -223,10 +205,7 @@ public final class UssdMessages {
     }
 
     public static String languageChanged(String language) {
-        if (isKinyarwanda(language)) {
-            return mainMenu("rw");
-        }
-        return mainMenu("en");
+        return mainMenu(isKinyarwanda(language) ? "rw" : "en");
     }
 
     public static String smsRegistrationBody(
