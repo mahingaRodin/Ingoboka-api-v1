@@ -179,10 +179,10 @@ GitHub repo → **Settings → Secrets and variables → Actions** → update:
 
 | Secret | New value |
 |--------|-----------|
-| `SERVER_HOST` | `YOUR_IP` (Azure public IP) |
+| `SERVER_HOST` | `4.168.192.169` (Azure public IP — update if IP changes) |
 | `SERVER_USERNAME` | `azureuser` |
 | `SERVER_SSH_KEY` | Private key that matches the VM’s authorized key |
-| `SERVER_SSH_PASSPHRASE` | If your key has one; else empty / remove if unused |
+| `SERVER_SSH_PASSPHRASE` | Optional — only if the private key is encrypted; omit otherwise |
 
 Push to `main` → existing workflow copies the bundle to `/opt/ingoboka` and runs `docker compose up -d --build`.
 

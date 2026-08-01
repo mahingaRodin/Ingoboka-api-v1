@@ -280,9 +280,14 @@ On every **push/PR to `main`**:
 
 1. `build-and-test` — `./mvnw clean verify -B -Dintegration=true`
 2. On **push to main** — Docker image build
-3. **Deploy** — Bundle copied to VPS via SCP; `docker compose up -d --build`
+3. **Deploy** — Bundle copied to Azure VM via SCP; `docker compose up -d --build` (preserves server `deploy/.env`)
 
-Required GitHub secrets: `SERVER_HOST`, `SERVER_USERNAME`, `SERVER_SSH_KEY`, `SERVER_SSH_PASSPHRASE`.
+Required GitHub secrets: `SERVER_HOST` (e.g. `4.168.192.169`), `SERVER_USERNAME` (`azureuser`), `SERVER_SSH_KEY`.  
+Optional: `SERVER_SSH_PASSPHRASE` (only if the SSH key is encrypted).
+
+After deploy:
+- API: `http://SERVER_HOST:8085/api/v1`
+- Swagger: `http://SERVER_HOST:8085/swagger-ui.html`
 
 ---
 
