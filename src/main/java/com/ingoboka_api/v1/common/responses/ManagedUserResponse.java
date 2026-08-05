@@ -23,6 +23,12 @@ public class ManagedUserResponse {
     UUID organizationId;
     String organizationName;
     Set<String> roles;
+    String province;
+    String district;
+    String sector;
+    String cell;
+    String village;
+    String country;
     Instant createdAt;
     Instant updatedAt;
 }

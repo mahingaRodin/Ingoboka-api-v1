@@ -28,4 +28,14 @@ public class CreateManagedUserRequest {
 
     @Size(min = 8, message = "Default password must be at least 8 characters when provided")
     private String defaultPassword;
+
+    private String province;
+
+    private String district;
+
+    private String sector;
+
+    private String cell;
+
+    private String village;
 }
