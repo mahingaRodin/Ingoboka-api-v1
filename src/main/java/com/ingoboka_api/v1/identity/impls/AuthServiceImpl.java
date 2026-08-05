@@ -291,9 +291,16 @@ public class AuthServiceImpl implements AuthService {
         if (stored.getExpiresAt().isBefore(Instant.now())) {
             throw new BusinessException("Refresh token expired");
         }
+        User user = stored.getUser();
+        if (user.getStatus() == UserStatus.DISABLED) {
+            throw new BusinessException("Account is disabled");
+        }
+        if (user.getStatus() == UserStatus.LOCKED) {
+            throw new BusinessException("Account is locked");
+        }
         stored.setRevoked(true);
         refreshTokenRepository.save(stored);
-        return buildAuthResponse(stored.getUser());
+        return buildAuthResponse(user);
     }
 
     @Transactional

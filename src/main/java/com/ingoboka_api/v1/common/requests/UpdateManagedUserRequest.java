@@ -17,4 +17,14 @@ public class UpdateManagedUserRequest {
     private String email;
 
     private String phoneNumber;
+
+    private String province;
+
+    private String district;
+
+    private String sector;
+
+    private String cell;
+
+    private String village;
 }

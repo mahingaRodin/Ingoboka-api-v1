@@ -61,6 +61,24 @@ public class User {
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword = false;
 
+    @Column(length = 120)
+    private String province;
+
+    @Column(length = 120)
+    private String district;
+
+    @Column(length = 120)
+    private String sector;
+
+    @Column(length = 120)
+    private String cell;
+
+    @Column(length = 120)
+    private String village;
+
+    @Column(nullable = false, length = 60)
+    private String country = "Rwanda";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

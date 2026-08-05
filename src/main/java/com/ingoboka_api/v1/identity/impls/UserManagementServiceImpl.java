@@ -20,6 +20,7 @@ import com.ingoboka_api.v1.identity.models.Role;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.identity.models.User;
 import com.ingoboka_api.v1.identity.repositories.OrganizationRepository;
+import com.ingoboka_api.v1.identity.repositories.RefreshTokenRepository;
 import com.ingoboka_api.v1.identity.repositories.RoleRepository;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.identity.services.NotificationService;
@@ -47,6 +48,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final OrganizationRepository organizationRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final StaffProvisioningService staffProvisioningService;
     private final NotificationService notificationService;
     private final PasswordEncoder passwordEncoder;
@@ -102,7 +104,15 @@ public class UserManagementServiceImpl implements UserManagementService {
                 request.getRoleCode(),
                 request.getDefaultPassword());
 
-        return getUser(created.getUserId());
+        User user = requireUser(created.getUserId());
+        user.setProvince(request.getProvince());
+        user.setDistrict(request.getDistrict());
+        user.setSector(request.getSector());
+        user.setCell(request.getCell());
+        user.setVillage(request.getVillage());
+        user.setCountry("Rwanda");
+        user.setUpdatedAt(Instant.now());
+        return toResponse(userRepository.save(user));
     }
 
     @Override
@@ -125,6 +135,21 @@ public class UserManagementServiceImpl implements UserManagementService {
         }
         if (request.getPhoneNumber() != null) {
             user.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getProvince() != null) {
+            user.setProvince(request.getProvince());
+        }
+        if (request.getDistrict() != null) {
+            user.setDistrict(request.getDistrict());
+        }
+        if (request.getSector() != null) {
+            user.setSector(request.getSector());
+        }
+        if (request.getCell() != null) {
+            user.setCell(request.getCell());
+        }
+        if (request.getVillage() != null) {
+            user.setVillage(request.getVillage());
         }
         user.setUpdatedAt(Instant.now());
         return toResponse(userRepository.save(user));
@@ -156,7 +181,9 @@ public class UserManagementServiceImpl implements UserManagementService {
         rejectCitizenAccount(user);
         user.setStatus(request.getStatus());
         user.setUpdatedAt(Instant.now());
-        return toResponse(userRepository.save(user));
+        User saved = userRepository.save(user);
+        revokeRefreshTokensIfInactive(saved);
+        return toResponse(saved);
     }
 
     @Override
@@ -190,7 +217,14 @@ public class UserManagementServiceImpl implements UserManagementService {
         rejectCitizenAccount(user);
         user.setStatus(UserStatus.DISABLED);
         user.setUpdatedAt(Instant.now());
-        userRepository.save(user);
+        User saved = userRepository.save(user);
+        revokeRefreshTokensIfInactive(saved);
+    }
+
+    private void revokeRefreshTokensIfInactive(User user) {
+        if (user.getStatus() == UserStatus.DISABLED || user.getStatus() == UserStatus.LOCKED) {
+            refreshTokenRepository.revokeAllForUser(user);
+        }
     }
 
     private User requireUser(UUID userId) {
@@ -254,6 +288,12 @@ public class UserManagementServiceImpl implements UserManagementService {
                 .organizationId(user.getOrganization() != null ? user.getOrganization().getId() : null)
                 .organizationName(user.getOrganization() != null ? user.getOrganization().getName() : null)
                 .roles(user.getRoles().stream().map(Role::getCode).collect(Collectors.toSet()))
+                .province(user.getProvince())
+                .district(user.getDistrict())
+                .sector(user.getSector())
+                .cell(user.getCell())
+                .village(user.getVillage())
+                .country(user.getCountry())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
