@@ -365,10 +365,14 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<ApplicationResponse> listAgentApplications(int page, int size) {
+    public PageResponse<ApplicationResponse> listAgentApplications(
+            ApplicationStatus status, int page, int size) {
         UUID orgId = requireAgentOrganizationId();
-        Page<PolicyApplication> result = applicationRepository.findByOrganizationIdOrderBySubmittedAtDesc(
-                orgId, PaginationUtils.toPageable(page, size, "submittedAt"));
+        Page<PolicyApplication> result = status == null
+                ? applicationRepository.findByOrganizationIdOrderBySubmittedAtDesc(
+                        orgId, PaginationUtils.toPageable(page, size, "submittedAt"))
+                : applicationRepository.findByOrganizationIdAndStatusOrderBySubmittedAtDesc(
+                        orgId, status, PaginationUtils.toPageable(page, size, "submittedAt"));
         return PageResponse.from(result.map(
                 app -> toApplicationResponse(app, loadAnswers(app.getId()))));
     }

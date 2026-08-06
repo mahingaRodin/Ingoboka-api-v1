@@ -96,7 +96,7 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> listTenantProducts(int page, int size) {
-        UUID orgId = requireInsurerOrganizationId();
+        UUID orgId = requireTenantOrganizationIdForRead();
         Page<InsuranceProduct> result = productRepository.findByOrganizationIdOrderByCreatedAtDesc(
                 orgId, PaginationUtils.toPageable(page, size));
         return PageResponse.from(result.map(this::toProductResponse));
@@ -390,6 +390,25 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
                 .orElseThrow(() -> new BusinessException("Product not found"));
     }
 
+    private UUID requireTenantOrganizationIdForRead() {
+        IngobokaUserDetails user = SecurityUtils.currentUser();
+        if (user.getOrganizationId() == null) {
+            throw new BusinessException("No organization associated with this account");
+        }
+        if (!canViewTenantProducts(user)) {
+            throw new BusinessException("Access denied to tenant products");
+        }
+        Organization org = organizationManagementService
+                .findById(user.getOrganizationId())
+                .orElseThrow(() -> new BusinessException("Organization not found"));
+        if (org.getType() != OrganizationType.INSURER
+                && org.getType() != OrganizationType.PARTNER
+                && !user.hasRole(RoleCodes.PLATFORM_ADMIN)) {
+            throw new BusinessException("Products can only be viewed by insurer or partner tenants");
+        }
+        return user.getOrganizationId();
+    }
+
     private UUID requireInsurerOrganizationId() {
         IngobokaUserDetails user = SecurityUtils.currentUser();
         if (user.getOrganizationId() == null) {
@@ -409,6 +428,14 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
             throw new BusinessException("Products can only be managed by insurer or partner tenants");
         }
         return user.getOrganizationId();
+    }
+
+    private boolean canViewTenantProducts(IngobokaUserDetails user) {
+        return user.hasRole(RoleCodes.INSURER_PRODUCT_MANAGER)
+                || user.hasRole(RoleCodes.PARTNER_ADMIN)
+                || user.hasRole(RoleCodes.PLATFORM_ADMIN)
+                || user.hasRole(RoleCodes.CLAIMS_OFFICER)
+                || user.hasRole(RoleCodes.CLAIMS_SUPERVISOR);
     }
 
     private void assertCanManageProducts(UUID organizationId) {
