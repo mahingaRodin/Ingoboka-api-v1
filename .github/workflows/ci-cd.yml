@@ -1,5 +1,7 @@
-name: CI/CD
-
+# NOTE: Errors such as "Failed to resolve action download info", "Service Unavailable",
+# or HTTP timeouts while *preparing* workflow jobs are usually GitHub Actions infrastructure
+# outages — re-run the workflow; they are not application bugs.
+#
 # Deploys to Azure VM (docker compose) on push to main.
 # Required GitHub secrets:
 #   SERVER_HOST      = 4.168.192.169
@@ -8,34 +10,65 @@ name: CI/CD
 # Optional:
 #   SERVER_SSH_PASSPHRASE = only if the private key is encrypted
 
+name: CI/CD
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 env:
   JAVA_VERSION: "21"
   REMOTE_APP_DIR: /opt/ingoboka
+  # Skip `clean` in CI so Maven + setup-java cache can reuse compiled classes between runs.
+  MAVEN_OPTS: >-
+    -Xmx1024m
+    -XX:+TieredCompilation
+    -XX:TieredStopAtLevel=1
+    -Dorg.slf4j.simpleLogger.defaultLogLevel=warn
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
           cache: maven
 
+      - name: Pre-pull Testcontainers images (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker pull postgres:16-alpine
+          docker pull redis:7-alpine
+
       - name: Build and test
-        run: ./mvnw clean verify -B -Dintegration=true
+        run: |
+          MVN="./mvnw -B verify -T 1C"
+          MVN="$MVN -Dsurefire.skipAfterFailureCount=1"
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "Main branch: running unit + Testcontainers integration tests"
+            $MVN -Dintegration=true
+          else
+            echo "PR/fast path: compile + unit tests (integration gated by -Dintegration=true)"
+            $MVN
+          fi
 
       - name: Upload Test Reports
         if: failure()
@@ -45,15 +78,16 @@ jobs:
           path: target/surefire-reports/
 
       - name: Build Docker image (sanity check)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: docker build -t ingoboka-api:${{ github.sha }} .
 
   deploy:
     needs: build-and-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Prepare deployment bundle
         run: |
@@ -68,27 +102,47 @@ jobs:
           tar -czf ingoboka-deploy.tar.gz -C bundle .
 
       - name: Copy bundle to Azure VM
-        uses: appleboy/scp-action@v0.1.7
+        id: scp
+        continue-on-error: true
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           passphrase: ${{ secrets.SERVER_SSH_PASSPHRASE }}
           port: 22
-          timeout: 60s
+          timeout: 120s
+          source: ingoboka-deploy.tar.gz
+          target: ${{ env.REMOTE_APP_DIR }}
+          overwrite: true
+
+      - name: Copy bundle to Azure VM (retry)
+        id: scp_retry
+        if: steps.scp.outcome == 'failure'
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          passphrase: ${{ secrets.SERVER_SSH_PASSPHRASE }}
+          port: 22
+          timeout: 120s
           source: ingoboka-deploy.tar.gz
           target: ${{ env.REMOTE_APP_DIR }}
           overwrite: true
 
       - name: Deploy with Docker Compose
-        uses: appleboy/ssh-action@v1.2.0
+        id: ssh_deploy
+        if: steps.scp.outcome == 'success' || steps.scp_retry.outcome == 'success'
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           passphrase: ${{ secrets.SERVER_SSH_PASSPHRASE }}
           port: 22
-          timeout: 60s
+          timeout: 120s
           command_timeout: 30m
           script: |
             set -euo pipefail
@@ -117,6 +171,66 @@ jobs:
 
             cd deploy
             # Prefer docker group; fall back to sudo on fresh Azure VMs
+            if docker info >/dev/null 2>&1; then
+              DC="docker compose"
+            else
+              DC="sudo docker compose"
+            fi
+
+            $DC up -d --build --remove-orphans
+            $DC ps
+
+            echo "Waiting for API health..."
+            for i in $(seq 1 30); do
+              if curl -sf http://127.0.0.1:8085/actuator/health/liveness >/dev/null 2>&1 \
+                || curl -sf http://127.0.0.1:8085/actuator/health >/dev/null 2>&1; then
+                echo "API is healthy"
+                curl -s http://127.0.0.1:8085/actuator/health || true
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "WARNING: health check did not pass in time — check: $DC logs api"
+            $DC logs --tail=80 api || true
+            exit 1
+
+      - name: Deploy with Docker Compose (retry)
+        if: >-
+          (steps.scp.outcome == 'success' || steps.scp_retry.outcome == 'success')
+          && steps.ssh_deploy.outcome == 'failure'
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          passphrase: ${{ secrets.SERVER_SSH_PASSPHRASE }}
+          port: 22
+          timeout: 120s
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+            APP_DIR="${{ env.REMOTE_APP_DIR }}"
+            mkdir -p "$APP_DIR/deploy"
+            cd "$APP_DIR"
+
+            if [ -f deploy/.env ]; then
+              cp deploy/.env /tmp/ingoboka.env.bak
+            fi
+
+            rm -rf src Dockerfile pom.xml mvnw mvnw.cmd .mvn
+            tar -xzf ingoboka-deploy.tar.gz
+            rm -f ingoboka-deploy.tar.gz
+
+            if [ -f /tmp/ingoboka.env.bak ]; then
+              mv /tmp/ingoboka.env.bak deploy/.env
+            fi
+
+            if [ ! -f deploy/.env ]; then
+              echo "ERROR: deploy/.env missing on server. Create it before CI deploy."
+              exit 1
+            fi
+
+            cd deploy
             if docker info >/dev/null 2>&1; then
               DC="docker compose"
             else
