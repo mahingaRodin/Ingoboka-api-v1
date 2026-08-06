@@ -1,5 +1,6 @@
 package com.ingoboka_api.v1.identity.impls;
 
+import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import com.ingoboka_api.v1.common.config.OtpDeliveryProperties;
 import com.ingoboka_api.v1.common.enums.OtpDeliveryChannel;
 import com.ingoboka_api.v1.common.config.JwtProperties;
@@ -34,6 +35,7 @@ import com.ingoboka_api.v1.identity.models.User;
 import com.ingoboka_api.v1.identity.models.VerificationToken;
 import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
 import com.ingoboka_api.v1.messaging.services.SmsDeliveryService;
+import com.ingoboka_api.v1.platform.services.PlatformSettingsService;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -75,6 +77,8 @@ public class AuthServiceImpl implements AuthService {
     private final ConsentRepository consentRepository;
     private final SmsDeliveryService smsDeliveryService;
     private final OtpDeliveryProperties otpDeliveryProperties;
+    private final AuditComplianceService auditComplianceService;
+    private final PlatformSettingsService platformSettingsService;
 
     private static final String OTP_PURPOSE_SIGNUP = "SIGNUP";
     private static final String SYNTHETIC_EMAIL_DOMAIN = "@phone.ingoboka.rw";
@@ -92,6 +96,12 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void register(RegisterRequest request) {
+        if (!platformSettingsService.isRegistrationEnabled()) {
+            throw new BusinessException("Citizen self-registration is currently disabled");
+        }
+        if (platformSettingsService.isMaintenanceMode()) {
+            throw new BusinessException("Platform is in maintenance mode");
+        }
         String phone = normalizePhone(request.getPhone());
         if (phone.isBlank()) {
             throw new BusinessException("Phone number is required");
@@ -131,6 +141,12 @@ public class AuthServiceImpl implements AuthService {
         user.setStatus(UserStatus.PENDING_EMAIL_VERIFICATION);
         user.setEmailVerified(false);
         user.setPhoneVerified(false);
+        user.setProvince(trimToNull(request.getProvince()));
+        user.setDistrict(trimToNull(request.getDistrict()));
+        user.setSector(trimToNull(request.getSector()));
+        user.setCell(trimToNull(request.getCell()));
+        user.setVillage(trimToNull(request.getVillage()));
+        user.setCountry("Rwanda");
         user.setCreatedAt(now);
         user.setUpdatedAt(now);
         user.getRoles().add(citizenRole);
@@ -149,6 +165,7 @@ public class AuthServiceImpl implements AuthService {
         citizenProfileRepository.save(profile);
 
         sendSignupOtp(user);
+        auditComplianceService.log("USER_REGISTERED", "USER", user.getId(), "Citizen registered: " + phone);
     }
 
     private String normalizePhone(String phone) {
@@ -170,6 +187,14 @@ public class AuthServiceImpl implements AuthService {
             return new String[] {trimmed, trimmed};
         }
         return new String[] {trimmed.substring(0, space), trimmed.substring(space + 1).trim()};
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private void sendSignupOtp(User user) {
@@ -233,7 +258,9 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("Account is locked");
         }
 
-        return buildAuthResponse(user);
+        AuthTokensResponse tokens = buildAuthResponse(user);
+        auditComplianceService.log("USER_LOGIN", "USER", user.getId(), "Login success: " + user.getEmail());
+        return tokens;
     }
 
     @Override

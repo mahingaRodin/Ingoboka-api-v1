@@ -35,13 +35,25 @@ public class AuditController {
 
     @GetMapping("/logs")
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'COMPLIANCE_AUDITOR', 'PARTNER_ADMIN')")
-    @Operation(summary = "List audit logs", description = "Paginated immutable activity trail")
+    @Operation(summary = "List audit logs", description = "Paginated immutable activity trail with filters")
     public ApiResponse<PageResponse<AuditLogResponse>> listLogs(
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String actor,
+            @RequestParam(required = false) String resourceType,
+            @RequestParam(required = false) String outcome,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortDir) {
         PageResponse<AuditLogResponse> data =
                 SecurityUtils.currentUser().hasRole(RoleCodes.PLATFORM_ADMIN)
-                        ? auditComplianceService.listAuditLogs(page, size)
-                        : auditComplianceService.listTenantAuditLogs(page, size);
+                        ? auditComplianceService.listAuditLogs(
+                                page, size, action, actor, resourceType, outcome, search, from, to, sortBy, sortDir)
+                        : auditComplianceService.listTenantAuditLogs(
+                                page, size, action, actor, resourceType, outcome, search, from, to, sortBy, sortDir);
         return ApiResponse.ok("Audit logs retrieved", data);
     }
 

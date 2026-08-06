@@ -22,4 +22,24 @@ public class RegisterRequest {
 
     /** Required when server OTP mode is EMAIL (SMS unavailable). Optional otherwise. */
     private String email;
+
+    @NotBlank(message = "Province is required")
+    @Size(max = 120)
+    private String province;
+
+    @NotBlank(message = "District is required")
+    @Size(max = 120)
+    private String district;
+
+    @NotBlank(message = "Sector is required")
+    @Size(max = 120)
+    private String sector;
+
+    @NotBlank(message = "Cell is required")
+    @Size(max = 120)
+    private String cell;
+
+    @NotBlank(message = "Village is required")
+    @Size(max = 120)
+    private String village;
 }

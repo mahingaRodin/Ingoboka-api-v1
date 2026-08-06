@@ -26,6 +26,8 @@ public interface PolicyRepository extends JpaRepository<Policy, UUID> {
 
     Page<Policy> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId, Pageable pageable);
 
+    Page<Policy> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
     boolean existsByApplicationId(UUID applicationId);
 
     long countByOrganizationIdAndStatus(UUID organizationId, PolicyStatus status);

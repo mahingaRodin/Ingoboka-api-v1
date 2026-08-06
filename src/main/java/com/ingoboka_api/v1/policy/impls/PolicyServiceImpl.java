@@ -141,6 +141,13 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<PolicyResponse> listTenantPolicies(int page, int size) {
+        IngobokaUserDetails user = SecurityUtils.currentUser();
+        // Platform admins have no tenant org — return all policies across the platform.
+        if (user.hasRole(RoleCodes.PLATFORM_ADMIN)) {
+            Page<Policy> all = policyRepository.findAllByOrderByCreatedAtDesc(
+                    PaginationUtils.toPageable(page, size));
+            return PageResponse.from(all.map(this::toResponse));
+        }
         UUID orgId = requireTenantOrganizationId();
         Page<Policy> result = policyRepository.findByOrganizationIdOrderByCreatedAtDesc(
                 orgId, PaginationUtils.toPageable(page, size));

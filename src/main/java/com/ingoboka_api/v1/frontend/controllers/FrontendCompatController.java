@@ -26,7 +26,8 @@ import lombok.RequiredArgsConstructor;
 import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import com.ingoboka_api.v1.document.services.DocumentStorageService;
 import com.ingoboka_api.v1.common.util.HashUtils;
-import org.springframework.beans.factory.annotation.Value;
+import com.ingoboka_api.v1.common.security.SecurityUtils;
+import com.ingoboka_api.v1.identity.models.RoleCodes;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -52,17 +53,6 @@ public class FrontendCompatController {
     private final ClaimRepository claimRepository;
     private final AuditComplianceService auditComplianceService;
     private final DocumentStorageService documentStorageService;
-
-    @Value("${ingoboka.platform.name:Ingoboka Platform}")
-    private String platformName;
-    @Value("${ingoboka.platform.default-locale:en}")
-    private String defaultLocale;
-    @Value("${ingoboka.platform.maintenance-mode:false}")
-    private boolean maintenanceMode;
-    @Value("${ingoboka.platform.api-base-url:/api/v1}")
-    private String apiBaseUrl;
-    @Value("${ingoboka.platform.support-email:support@ingoboka.rw}")
-    private String supportEmail;
 
     @GetMapping("/api/v1/customers/me")
     @PreAuthorize("hasRole('CITIZEN')")
@@ -138,11 +128,20 @@ public class FrontendCompatController {
     }
 
     @GetMapping("/api/v1/policies")
-    @PreAuthorize("hasRole('CITIZEN')")
+    @PreAuthorize("hasAnyRole('CITIZEN', 'UNDERWRITER', 'PARTNER_ADMIN', 'PLATFORM_ADMIN', 'CLAIMS_OFFICER')")
     @SecurityRequirement(name = "bearerAuth")
     public ApiResponse<PageResponse<PolicyResponse>> policiesAlias(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("Policies retrieved", policyService.listMyPolicies(page, size));
+        // Citizens get their own policies; staff/admin get tenant (or all-platform) policies.
+        var user = SecurityUtils.currentUser();
+        if (user.hasRole(RoleCodes.CITIZEN)
+                && !user.hasRole(RoleCodes.PLATFORM_ADMIN)
+                && !user.hasRole(RoleCodes.PARTNER_ADMIN)
+                && !user.hasRole(RoleCodes.UNDERWRITER)
+                && !user.hasRole(RoleCodes.CLAIMS_OFFICER)) {
+            return ApiResponse.ok("Policies retrieved", policyService.listMyPolicies(page, size));
+        }
+        return ApiResponse.ok("Policies retrieved", policyService.listTenantPolicies(page, size));
     }
 
     @GetMapping("/api/v1/policies/{policyId}/card")
@@ -263,19 +262,21 @@ public class FrontendCompatController {
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'PARTNER_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     public ApiResponse<PageResponse<com.ingoboka_api.v1.common.responses.AuditLogResponse>> adminAuditLogs(
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("Audit logs retrieved", auditComplianceService.listAuditLogs(page, size));
-    }
-
-    @GetMapping("/api/v1/admin/platform/settings")
-    public ApiResponse<PlatformSettingsResponse> platformSettings() {
-        return ApiResponse.ok("Platform settings", PlatformSettingsResponse.builder()
-                .platformName(platformName)
-                .defaultLocale(defaultLocale)
-                .maintenanceMode(maintenanceMode)
-                .apiBaseUrl(apiBaseUrl)
-                .supportEmail(supportEmail)
-                .build());
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String actor,
+            @RequestParam(required = false) String resourceType,
+            @RequestParam(required = false) String outcome,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortDir) {
+        return ApiResponse.ok(
+                "Audit logs retrieved",
+                auditComplianceService.listAuditLogs(
+                        page, size, action, actor, resourceType, outcome, search, from, to, sortBy, sortDir));
     }
 
     @GetMapping("/api/v1/insurer/applications")

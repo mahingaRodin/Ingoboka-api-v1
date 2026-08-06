@@ -16,17 +16,30 @@ import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
+import jakarta.persistence.criteria.Predicate;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
 public class AuditComplianceServiceImpl implements AuditComplianceService {
+
+    private static final Set<String> SORTABLE =
+            Set.of("createdAt", "action", "actorEmail", "entityType", "outcome");
 
     private final AuditLogRepository auditLogRepository;
     private final DataSubjectRequestRepository dataSubjectRequestRepository;
@@ -34,6 +47,12 @@ public class AuditComplianceServiceImpl implements AuditComplianceService {
     @Override
     @Transactional
     public void log(String action, String entityType, UUID entityId, String summary) {
+        log(action, entityType, entityId, summary, "SUCCESS");
+    }
+
+    @Override
+    @Transactional
+    public void log(String action, String entityType, UUID entityId, String summary, String outcome) {
         IngobokaUserDetails actor = safeCurrentUser();
         AuditLog entry = new AuditLog();
         entry.setId(UUID.randomUUID());
@@ -44,7 +63,8 @@ public class AuditComplianceServiceImpl implements AuditComplianceService {
         entry.setEntityType(entityType);
         entry.setEntityId(entityId);
         entry.setCorrelationId(MDC.get("correlationId"));
-        entry.setSummary(summary);
+        entry.setSummary(summary != null ? summary : action);
+        entry.setOutcome(StringUtils.hasText(outcome) ? outcome.toUpperCase(Locale.ROOT) : "SUCCESS");
         entry.setCreatedAt(Instant.now());
         auditLogRepository.save(entry);
     }
@@ -52,17 +72,52 @@ public class AuditComplianceServiceImpl implements AuditComplianceService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<AuditLogResponse> listAuditLogs(int page, int size) {
+        return listAuditLogs(page, size, null, null, null, null, null, null, null, "createdAt", "desc");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<AuditLogResponse> listAuditLogs(
+            int page,
+            int size,
+            String action,
+            String actor,
+            String resourceType,
+            String outcome,
+            String search,
+            String from,
+            String to,
+            String sortBy,
+            String sortDir) {
         if (!SecurityUtils.currentUser().hasRole(RoleCodes.PLATFORM_ADMIN)) {
             throw new BusinessException("Only platform administrators can view all audit logs");
         }
-        Page<AuditLog> result =
-                auditLogRepository.findAllByOrderByCreatedAtDesc(PaginationUtils.toPageable(page, size));
+        Pageable pageable = toSortedPageable(page, size, sortBy, sortDir);
+        Specification<AuditLog> spec = buildSpec(null, action, actor, resourceType, outcome, search, from, to);
+        Page<AuditLog> result = auditLogRepository.findAll(spec, pageable);
         return PageResponse.from(result.map(this::toResponse));
     }
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<AuditLogResponse> listTenantAuditLogs(int page, int size) {
+        return listTenantAuditLogs(page, size, null, null, null, null, null, null, null, "createdAt", "desc");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<AuditLogResponse> listTenantAuditLogs(
+            int page,
+            int size,
+            String action,
+            String actor,
+            String resourceType,
+            String outcome,
+            String search,
+            String from,
+            String to,
+            String sortBy,
+            String sortDir) {
         IngobokaUserDetails user = SecurityUtils.currentUser();
         if (!user.hasRole(RoleCodes.COMPLIANCE_AUDITOR)
                 && !user.hasRole(RoleCodes.PARTNER_ADMIN)
@@ -72,8 +127,10 @@ public class AuditComplianceServiceImpl implements AuditComplianceService {
         if (user.getOrganizationId() == null) {
             throw new BusinessException("No organization associated with this account");
         }
-        Page<AuditLog> result = auditLogRepository.findByOrganizationIdOrderByCreatedAtDesc(
-                user.getOrganizationId(), PaginationUtils.toPageable(page, size));
+        Pageable pageable = toSortedPageable(page, size, sortBy, sortDir);
+        Specification<AuditLog> spec =
+                buildSpec(user.getOrganizationId(), action, actor, resourceType, outcome, search, from, to);
+        Page<AuditLog> result = auditLogRepository.findAll(spec, pageable);
         return PageResponse.from(result.map(this::toResponse));
     }
 
@@ -136,6 +193,77 @@ public class AuditComplianceServiceImpl implements AuditComplianceService {
         return toDataSubjectResponse(entry);
     }
 
+    private Specification<AuditLog> buildSpec(
+            UUID organizationId,
+            String action,
+            String actor,
+            String resourceType,
+            String outcome,
+            String search,
+            String from,
+            String to) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (organizationId != null) {
+                predicates.add(cb.equal(root.get("organizationId"), organizationId));
+            }
+            if (StringUtils.hasText(action)) {
+                predicates.add(cb.like(cb.lower(root.get("action")), "%" + action.toLowerCase(Locale.ROOT) + "%"));
+            }
+            if (StringUtils.hasText(actor)) {
+                predicates.add(
+                        cb.like(cb.lower(root.get("actorEmail")), "%" + actor.toLowerCase(Locale.ROOT) + "%"));
+            }
+            if (StringUtils.hasText(resourceType)) {
+                predicates.add(cb.equal(cb.upper(root.get("entityType")), resourceType.toUpperCase(Locale.ROOT)));
+            }
+            if (StringUtils.hasText(outcome)) {
+                predicates.add(cb.equal(cb.upper(root.get("outcome")), outcome.toUpperCase(Locale.ROOT)));
+            }
+            Instant fromInstant = parseInstant(from);
+            Instant toInstant = parseInstant(to);
+            if (fromInstant != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), fromInstant));
+            }
+            if (toInstant != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), toInstant));
+            }
+            if (StringUtils.hasText(search)) {
+                String like = "%" + search.toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("action")), like),
+                        cb.like(cb.lower(root.get("actorEmail")), like),
+                        cb.like(cb.lower(root.get("entityType")), like),
+                        cb.like(cb.lower(root.get("summary")), like)));
+            }
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private Pageable toSortedPageable(int page, int size, String sortBy, String sortDir) {
+        String property = SORTABLE.contains(sortBy) ? sortBy : "createdAt";
+        Sort.Direction direction =
+                "asc".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        int safeSize = Math.min(Math.max(size, 1), 200);
+        int safePage = Math.max(page, 0);
+        return PageRequest.of(safePage, safeSize, Sort.by(direction, property));
+    }
+
+    private Instant parseInstant(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        try {
+            return Instant.parse(raw);
+        } catch (Exception ex) {
+            try {
+                return Instant.parse(raw + "T00:00:00Z");
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+    }
+
     private IngobokaUserDetails safeCurrentUser() {
         try {
             return SecurityUtils.currentUser();
@@ -155,6 +283,7 @@ public class AuditComplianceServiceImpl implements AuditComplianceService {
                 .entityId(log.getEntityId())
                 .correlationId(log.getCorrelationId())
                 .summary(log.getSummary())
+                .outcome(log.getOutcome() != null ? log.getOutcome() : "SUCCESS")
                 .createdAt(log.getCreatedAt())
                 .build();
     }

@@ -1,5 +1,6 @@
 package com.ingoboka_api.v1.common.responses;
 
+import java.time.Instant;
 import lombok.Builder;
 import lombok.Value;
 
@@ -11,4 +12,18 @@ public class PlatformSettingsResponse {
     boolean maintenanceMode;
     String apiBaseUrl;
     String supportEmail;
+    String supportPhone;
+    String brandingTagline;
+    boolean registrationEnabled;
+    boolean selfServiceClaimsEnabled;
+    boolean emailNotificationsEnabled;
+    boolean smsNotificationsEnabled;
+    boolean ussdEnabled;
+    boolean agentAssistedEnabled;
+    boolean requireKycBeforeEnrollment;
+    String defaultCurrency;
+    int defaultPolicyGraceDays;
+    int maxLoginAttempts;
+    int apiRateLimitPerMinute;
+    Instant updatedAt;
 }

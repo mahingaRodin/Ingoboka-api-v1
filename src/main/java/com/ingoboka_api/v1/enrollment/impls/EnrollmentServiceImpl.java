@@ -420,6 +420,12 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             policyIssuanceService.issueFromApprovedApplication(application);
         }
 
+        auditComplianceService.log(
+                "APPLICATION_REVIEWED",
+                "APPLICATION",
+                application.getId(),
+                "Application " + application.getApplicationReference() + " → " + request.getStatus());
+
         return toApplicationResponse(application, loadAnswers(application.getId()));
     }
 

@@ -27,7 +27,7 @@ class CitizenEndpointsIntegrationTest extends IntegrationTestSupport {
         post(
                         "/api/v1/auth/register",
                         """
-                        {"fullName":"Flow Citizen","phone":"%s","nationalId":"%s","password":"Citizen@Test123","email":"%s"}
+                        {"fullName":"Flow Citizen","phone":"%s","nationalId":"%s","password":"Citizen@Test123","email":"%s","province":"City of Kigali","district":"Nyarugenge","sector":"Gitega","cell":"Akabahizi","village":"Gihanga"}
                         """
                                 .formatted(phone, nationalId, email))
                 .andExpect(status().isCreated());

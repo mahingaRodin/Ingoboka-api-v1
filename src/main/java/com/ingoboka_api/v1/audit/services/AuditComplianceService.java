@@ -11,9 +11,37 @@ public interface AuditComplianceService {
 
     void log(String action, String entityType, UUID entityId, String summary);
 
+    void log(String action, String entityType, UUID entityId, String summary, String outcome);
+
     PageResponse<AuditLogResponse> listAuditLogs(int page, int size);
 
+    PageResponse<AuditLogResponse> listAuditLogs(
+            int page,
+            int size,
+            String action,
+            String actor,
+            String resourceType,
+            String outcome,
+            String search,
+            String from,
+            String to,
+            String sortBy,
+            String sortDir);
+
     PageResponse<AuditLogResponse> listTenantAuditLogs(int page, int size);
+
+    PageResponse<AuditLogResponse> listTenantAuditLogs(
+            int page,
+            int size,
+            String action,
+            String actor,
+            String resourceType,
+            String outcome,
+            String search,
+            String from,
+            String to,
+            String sortBy,
+            String sortDir);
 
     DataSubjectRequestResponse submitDataSubjectRequest(SubmitDataSubjectRequest request);
 
