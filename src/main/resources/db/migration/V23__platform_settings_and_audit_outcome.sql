@@ -17,9 +17,9 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_email ON audit_logs (actor_email
 CREATE INDEX IF NOT EXISTS idx_audit_logs_outcome ON audit_logs (outcome);
 
 -- Seed sensible defaults (idempotent).
-INSERT INTO platform_settings (setting_key, setting_value, updated_at)
+INSERT INTO platform_settings (setting_key, setting_value)
 VALUES
-    ('platformName', 'Ingoboka', NOW()),
+    ('platformName', 'Ingoboka'),
     ('defaultLocale', 'rw'),
     ('maintenanceMode', 'false'),
     ('apiBaseUrl', '/api/v1'),
