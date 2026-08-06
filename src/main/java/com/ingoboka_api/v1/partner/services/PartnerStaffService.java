@@ -24,6 +24,8 @@ public interface PartnerStaffService {
 
     StaffResponse resetStaffCredentials(UUID partnerId, UUID userId, ResetManagedUserPasswordRequest request);
 
+    StaffResponse resendStaffInvite(UUID partnerId, UUID userId);
+
     void deleteStaff(UUID partnerId, UUID userId);
 
     PartnerStaffOverviewResponse getStaffOverview(UUID partnerId);

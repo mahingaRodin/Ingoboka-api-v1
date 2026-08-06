@@ -1,0 +1,15 @@
+Subject: You're invited to join {{organizationName}} on Ingoboka
+
+Hello {{fullName}},
+
+{{inviterName}} has invited you to join {{organizationName}} on Ingoboka as a team member.
+
+Click the link below to set your password and activate your account:
+
+{{activateUrl}}
+
+This invitation link expires in {{hours}} hours.
+
+If you did not expect this invitation, you can safely ignore this email.
+
+— Ingoboka Platform

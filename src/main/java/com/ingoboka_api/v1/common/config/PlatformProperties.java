@@ -14,4 +14,5 @@ public class PlatformProperties {
     private String name = "Ingoboka Platform";
     private String frontendLoginUrl = "http://localhost:3000/login";
     private String frontendVerifyEmailUrl = "http://localhost:3000/verify-email";
+    private String frontendActivateAccountUrl = "http://localhost:3000/activate";
 }

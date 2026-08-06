@@ -13,4 +13,6 @@ public class StaffCreatedResponse {
     UUID organizationId;
     boolean activationRequired;
     boolean mustChangePassword;
+    boolean inviteSent;
+    String enrollmentStatus;
 }

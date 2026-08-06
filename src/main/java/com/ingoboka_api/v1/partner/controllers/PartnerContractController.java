@@ -43,7 +43,7 @@ public class PartnerContractController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'PARTNER_ADMIN')")
+    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'PARTNER_ADMIN', 'CLAIMS_OFFICER', 'FINANCE_OFFICER')")
     @Operation(summary = "List contracts", description = "View contracts for a partner tenant")
     public ApiResponse<PageResponse<PartnerContractResponse>> listContracts(
             @PathVariable UUID partnerId,

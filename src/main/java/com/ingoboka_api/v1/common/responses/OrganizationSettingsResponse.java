@@ -9,6 +9,7 @@ import lombok.Value;
 @Builder
 public class OrganizationSettingsResponse {
     UUID organizationId;
+    String organizationName;
     String settingsJson;
     Instant updatedAt;
 }

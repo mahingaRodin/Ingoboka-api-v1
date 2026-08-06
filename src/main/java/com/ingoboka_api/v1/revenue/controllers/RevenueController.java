@@ -48,7 +48,7 @@ public class RevenueController {
     }
 
     @GetMapping("/ledger")
-    @PreAuthorize("hasAnyRole('PARTNER_ADMIN', 'FINANCE_OFFICER', 'PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('PARTNER_ADMIN', 'FINANCE_OFFICER', 'CLAIMS_OFFICER', 'PLATFORM_ADMIN')")
     @Operation(summary = "List revenue ledger entries (paginated)")
     public ApiResponse<PageResponse<RevenueLedgerResponse>> listLedger(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
@@ -56,7 +56,7 @@ public class RevenueController {
     }
 
     @GetMapping("/invoices")
-    @PreAuthorize("hasAnyRole('PARTNER_ADMIN', 'FINANCE_OFFICER', 'PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('PARTNER_ADMIN', 'FINANCE_OFFICER', 'CLAIMS_OFFICER', 'PLATFORM_ADMIN')")
     @Operation(summary = "List invoices (paginated)")
     public ApiResponse<PageResponse<InvoiceResponse>> listInvoices(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {

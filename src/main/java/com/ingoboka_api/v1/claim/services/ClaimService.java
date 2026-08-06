@@ -5,6 +5,7 @@ import com.ingoboka_api.v1.common.requests.AttachClaimDocumentRequest;
 import com.ingoboka_api.v1.common.requests.CreateClaimAppealRequest;
 import com.ingoboka_api.v1.common.requests.CreateClaimRequest;
 import com.ingoboka_api.v1.common.requests.RecordClaimDecisionRequest;
+import com.ingoboka_api.v1.common.requests.UpdateClaimRequest;
 import com.ingoboka_api.v1.common.requests.UpdateClaimStatusRequest;
 import com.ingoboka_api.v1.common.responses.ClaimAppealResponse;
 import com.ingoboka_api.v1.common.responses.ClaimsBreakdownResponse;
@@ -23,6 +24,20 @@ public interface ClaimService {
     PageResponse<ClaimResponse> listMyClaims(int page, int size);
 
     PageResponse<ClaimResponse> listTenantClaims(ClaimStatus status, int page, int size);
+
+    PageResponse<ClaimResponse> listTenantClaimsFiltered(
+            ClaimStatus status,
+            String search,
+            String province,
+            String district,
+            String sortBy,
+            String sortDir,
+            int page,
+            int size);
+
+    ClaimResponse createTenantClaim(CreateClaimRequest request);
+
+    ClaimResponse updateClaim(UUID claimId, UpdateClaimRequest request);
 
     ClaimResponse updateStatus(UUID claimId, UpdateClaimStatusRequest request);
 

@@ -23,6 +23,7 @@ import com.ingoboka_api.v1.common.requests.AttachClaimDocumentRequest;
 import com.ingoboka_api.v1.common.requests.CreateClaimAppealRequest;
 import com.ingoboka_api.v1.common.requests.CreateClaimRequest;
 import com.ingoboka_api.v1.common.requests.RecordClaimDecisionRequest;
+import com.ingoboka_api.v1.common.requests.UpdateClaimRequest;
 import com.ingoboka_api.v1.common.requests.UpdateClaimStatusRequest;
 import com.ingoboka_api.v1.common.responses.ClaimAppealResponse;
 import com.ingoboka_api.v1.common.responses.ClaimsBreakdownResponse;
@@ -43,7 +44,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +61,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class ClaimServiceImpl implements ClaimService {
 
     private static final Set<ClaimStatus> APPEALABLE = Set.of(ClaimStatus.REJECTED, ClaimStatus.APPROVED);
+
+    private static final Map<String, List<String>> PROVINCE_DISTRICTS = buildProvinceDistricts();
+
+    private static Map<String, List<String>> buildProvinceDistricts() {
+        Map<String, List<String>> map = new LinkedHashMap<>();
+        map.put("City of Kigali", List.of("Gasabo", "Kicukiro", "Nyarugenge"));
+        map.put("Eastern Province", List.of("Bugesera", "Gatsibo", "Kayonza", "Kirehe", "Ngoma", "Nyagatare", "Rwamagana"));
+        map.put("Northern Province", List.of("Burera", "Gakenke", "Gicumbi", "Musanze", "Rulindo"));
+        map.put("Southern Province", List.of("Gisagara", "Huye", "Kamonyi", "Muhanga", "Nyamagabe", "Nyanza", "Nyaruguru", "Ruhango"));
+        map.put("Western Province", List.of("Karongi", "Ngororero", "Nyabihu", "Nyamasheke", "Rubavu", "Rusizi", "Rutsiro"));
+        return map;
+    }
 
     private final ClaimRepository claimRepository;
     private final ClaimDocumentRepository claimDocumentRepository;
@@ -135,13 +149,90 @@ public class ClaimServiceImpl implements ClaimService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<ClaimResponse> listTenantClaims(ClaimStatus status, int page, int size) {
+        return listTenantClaimsFiltered(status, null, null, null, "createdAt", "desc", page, size);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ClaimResponse> listTenantClaimsFiltered(
+            ClaimStatus status,
+            String search,
+            String province,
+            String district,
+            String sortBy,
+            String sortDir,
+            int page,
+            int size) {
         UUID orgId = requireClaimsOrganizationId();
-        Page<Claim> result = status == null
-                ? claimRepository.findByOrganizationIdOrderByCreatedAtDesc(
-                        orgId, PaginationUtils.toPageable(page, size))
-                : claimRepository.findByOrganizationIdAndStatusOrderByCreatedAtDesc(
-                        orgId, status, PaginationUtils.toPageable(page, size));
+        List<String> districtsInProvince = Collections.emptyList();
+        if (province != null && !province.isBlank()) {
+            districtsInProvince = PROVINCE_DISTRICTS.getOrDefault(province, List.of("__none__"));
+        }
+        String sortProperty = sortBy != null && !sortBy.isBlank() ? sortBy : "createdAt";
+        Page<Claim> result = claimRepository.findTenantClaimsFiltered(
+                orgId,
+                status,
+                search,
+                district,
+                province,
+                districtsInProvince,
+                PaginationUtils.toPageable(page, size, sortProperty, "desc".equalsIgnoreCase(sortDir) ? "desc" : "asc"));
         return PageResponse.from(result.map(this::toResponse));
+    }
+
+    @Override
+    @Transactional
+    public ClaimResponse createTenantClaim(CreateClaimRequest request) {
+        UUID orgId = requireClaimsOrganizationId();
+        Policy policy = policyRepository
+                .findById(request.getPolicyId())
+                .orElseThrow(() -> new BusinessException("Policy not found"));
+        if (!policy.getOrganizationId().equals(orgId)) {
+            throw new BusinessException("Policy does not belong to this insurer");
+        }
+        if (policy.getStatus() != PolicyStatus.ACTIVE) {
+            throw new BusinessException("Claims can only be filed against active policies");
+        }
+
+        Instant now = Instant.now();
+        Claim claim = new Claim();
+        claim.setId(UUID.randomUUID());
+        claim.setClaimNumber(generateClaimNumber());
+        claim.setPolicyId(policy.getId());
+        claim.setOrganizationId(policy.getOrganizationId());
+        claim.setCitizenProfileId(policy.getCitizenProfileId());
+        claim.setClaimType(request.getClaimType());
+        claim.setDescription(request.getDescription());
+        claim.setClaimedAmount(request.getClaimedAmount());
+        claim.setIncidentDate(request.getIncidentDate());
+        claim.setStatus(ClaimStatus.SUBMITTED);
+        claim.setCreatedAt(now);
+        claim.setUpdatedAt(now);
+        claimRepository.save(claim);
+        UUID actorId = SecurityUtils.currentUser().getUserId();
+        transitionStatus(claim, ClaimStatus.SUBMITTED, "Created by insurer staff", actorId);
+        claimRepository.save(claim);
+        return toResponse(claim);
+    }
+
+    @Override
+    @Transactional
+    public ClaimResponse updateClaim(UUID claimId, UpdateClaimRequest request) {
+        requireClaimsOrganizationId();
+        Claim claim = claimRepository
+                .findById(claimId)
+                .orElseThrow(() -> new BusinessException("Claim not found"));
+        assertTenantAccess(claim);
+        if (claim.getStatus() == ClaimStatus.APPROVED || claim.getStatus() == ClaimStatus.REJECTED) {
+            throw new BusinessException("Cannot update a finalized claim");
+        }
+        if (request.getClaimType() != null) claim.setClaimType(request.getClaimType());
+        if (request.getDescription() != null) claim.setDescription(request.getDescription());
+        if (request.getClaimedAmount() != null) claim.setClaimedAmount(request.getClaimedAmount());
+        if (request.getIncidentDate() != null) claim.setIncidentDate(request.getIncidentDate());
+        claim.setUpdatedAt(Instant.now());
+        claimRepository.save(claim);
+        return toResponse(claim);
     }
 
     @Override

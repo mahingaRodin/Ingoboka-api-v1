@@ -25,4 +25,7 @@ public class CreateStaffRequest {
 
     @Size(min = 8, message = "Default password must be at least 8 characters when provided")
     private String defaultPassword;
+
+    /** When true, sends an invite link instead of a temporary password email. Defaults to true. */
+    private boolean inviteOnly = true;
 }

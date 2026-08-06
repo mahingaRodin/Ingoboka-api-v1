@@ -161,9 +161,32 @@ public class FrontendCompatController {
     @SecurityRequirement(name = "bearerAuth")
     public ApiResponse<PageResponse<ClaimResponse>> adminClaims(
             @RequestParam(required = false) ClaimStatus status,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String province,
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortDir,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("Claims retrieved", claimService.listTenantClaims(status, page, size));
+        return ApiResponse.ok(
+                "Claims retrieved",
+                claimService.listTenantClaimsFiltered(status, search, province, district, sortBy, sortDir, page, size));
+    }
+
+    @PostMapping("/api/v1/admin/claims")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<ClaimResponse> adminCreateClaim(@Valid @RequestBody CreateClaimRequest request) {
+        return ApiResponse.ok("Claim created", claimService.createTenantClaim(request));
+    }
+
+    @PutMapping("/api/v1/admin/claims/{claimId}")
+    @PreAuthorize("hasAnyRole('CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<ClaimResponse> adminUpdateClaim(
+            @PathVariable UUID claimId, @Valid @RequestBody UpdateClaimRequest request) {
+        return ApiResponse.ok("Claim updated", claimService.updateClaim(claimId, request));
     }
 
     @GetMapping("/api/v1/admin/claims/{claimId}")
