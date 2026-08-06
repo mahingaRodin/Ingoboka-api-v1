@@ -5,10 +5,13 @@ import com.ingoboka_api.v1.common.requests.CreateDependantRequest;
 import com.ingoboka_api.v1.common.requests.FrontendConsentRequest;
 import com.ingoboka_api.v1.common.requests.GrantConsentRequest;
 import com.ingoboka_api.v1.common.requests.ReviewKycRequest;
+import com.ingoboka_api.v1.common.requests.SaveNeedsAssessmentPreferencesRequest;
 import com.ingoboka_api.v1.common.requests.UpdateCitizenProfileRequest;
+import com.ingoboka_api.v1.common.requests.UpdateDependantRequest;
 import com.ingoboka_api.v1.common.responses.CitizenProfileResponse;
 import com.ingoboka_api.v1.common.responses.ConsentResponse;
 import com.ingoboka_api.v1.common.responses.DependantResponse;
+import com.ingoboka_api.v1.common.responses.NeedsAssessmentPreferencesResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.customer.models.CitizenProfile;
 import com.ingoboka_api.v1.customer.models.Consent;
@@ -23,6 +26,8 @@ public interface CustomerProfileService {
     PageResponse<DependantResponse> listMyDependants(int page, int size);
 
     DependantResponse addDependant(CreateDependantRequest request);
+
+    DependantResponse updateDependant(UUID dependantId, UpdateDependantRequest request);
 
     void removeDependant(UUID dependantId);
 
@@ -41,4 +46,8 @@ public interface CustomerProfileService {
     CitizenProfileResponse submitKyc();
 
     ConsentResponse grantFrontendConsent(FrontendConsentRequest request, String ipAddress);
+
+    NeedsAssessmentPreferencesResponse getNeedsAssessmentPreferences();
+
+    NeedsAssessmentPreferencesResponse saveNeedsAssessmentPreferences(SaveNeedsAssessmentPreferencesRequest request);
 }

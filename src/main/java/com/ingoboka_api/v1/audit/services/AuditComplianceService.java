@@ -1,5 +1,6 @@
 package com.ingoboka_api.v1.audit.services;
 
+import com.ingoboka_api.v1.common.enums.AuditOutcome;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.AuditLogResponse;
 import com.ingoboka_api.v1.common.requests.SubmitDataSubjectRequest;
@@ -12,6 +13,16 @@ public interface AuditComplianceService {
     void log(String action, String entityType, UUID entityId, String summary);
 
     void log(String action, String entityType, UUID entityId, String summary, String outcome);
+
+    void log(AuditOutcome outcome, String action, String entityType, UUID entityId, String summary);
+
+    void logSystem(
+            AuditOutcome outcome,
+            String action,
+            String entityType,
+            UUID entityId,
+            String summary,
+            String actorEmail);
 
     PageResponse<AuditLogResponse> listAuditLogs(int page, int size);
 

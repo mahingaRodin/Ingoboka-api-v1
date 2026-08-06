@@ -1,6 +1,7 @@
 package com.ingoboka_api.v1.billing.impls;
 
 import com.ingoboka_api.v1.audit.services.AuditComplianceService;
+import com.ingoboka_api.v1.common.enums.AuditOutcome;
 import com.ingoboka_api.v1.billing.models.Bill;
 import com.ingoboka_api.v1.billing.models.Payment;
 import com.ingoboka_api.v1.billing.models.PaymentEvent;
@@ -147,6 +148,12 @@ public class BillingServiceImpl implements BillingService {
         PaymentInitiationResult initiation = adapter.initiate(payment, request, payerPhone);
         payment.setProviderReference(initiation.getProviderReference());
         paymentRepository.save(payment);
+        auditComplianceService.log(
+                AuditOutcome.PENDING,
+                "PAYMENT_INITIATED",
+                "PAYMENT",
+                payment.getId(),
+                "Awaiting provider confirmation for policy " + payment.getPolicyId());
         return toResponse(payment, initiation);
     }
 
@@ -202,6 +209,9 @@ public class BillingServiceImpl implements BillingService {
         if ("FAILED".equalsIgnoreCase(status)) {
             return "FAILED";
         }
+        if ("PENDING".equalsIgnoreCase(status)) {
+            return "PENDING";
+        }
         throw new BusinessException("Unsupported MoMo payment status: " + status);
     }
 
@@ -247,6 +257,21 @@ public class BillingServiceImpl implements BillingService {
             payment.setStatus(PaymentStatus.FAILED);
             payment.setCompletedAt(now);
             paymentRepository.save(payment);
+            auditComplianceService.log(
+                    AuditOutcome.FAILED,
+                    "PAYMENT_FAILED",
+                    "PAYMENT",
+                    payment.getId(),
+                    "Payment " + payment.getProviderReference() + " failed for policy " + payment.getPolicyId());
+        } else if ("PENDING".equalsIgnoreCase(request.getStatus())) {
+            payment.setStatus(PaymentStatus.PENDING);
+            paymentRepository.save(payment);
+            auditComplianceService.log(
+                    AuditOutcome.PENDING,
+                    "PAYMENT_PENDING",
+                    "PAYMENT",
+                    payment.getId(),
+                    "Payment " + payment.getProviderReference() + " awaiting confirmation");
         } else {
             throw new BusinessException("Unsupported payment status");
         }

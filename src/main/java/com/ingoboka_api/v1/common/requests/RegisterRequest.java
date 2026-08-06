@@ -23,6 +23,10 @@ public class RegisterRequest {
     /** Required when server OTP mode is EMAIL (SMS unavailable). Optional otherwise. */
     private String email;
 
+    /** Optional external profile picture URL (http/https). */
+    @Size(max = 2048)
+    private String profilePictureUrl;
+
     @NotBlank(message = "Province is required")
     @Size(max = 120)
     private String province;

@@ -79,6 +79,9 @@ public class User {
     @Column(nullable = false, length = 60)
     private String country = "Rwanda";
 
+    @Column(name = "profile_picture_key", length = 512)
+    private String profilePictureKey;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

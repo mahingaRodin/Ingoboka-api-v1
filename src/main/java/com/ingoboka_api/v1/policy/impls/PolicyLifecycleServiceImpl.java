@@ -167,12 +167,12 @@ public class PolicyLifecycleServiceImpl implements PolicyLifecycleService {
     private void notifyPolicyholder(Policy policy, String template, Map<String, String> vars) {
         citizenProfileRepository.findById(policy.getCitizenProfileId()).ifPresent(profile -> userRepository
                 .findById(profile.getUserId())
-                .ifPresent(user -> notificationTemplateService.sendTemplated(
+                .ifPresent(user -> notificationTemplateService.notifyAllChannels(
                         user.getId(),
                         policy.getOrganizationId(),
                         template,
-                        NotificationChannel.EMAIL,
                         user.getEmail(),
+                        user.getPhoneNumber(),
                         vars)));
     }
 }

@@ -1,6 +1,8 @@
 package com.ingoboka_api.v1.enrollment.impls;
 
+import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import com.ingoboka_api.v1.common.enums.ApplicationStatus;
+import com.ingoboka_api.v1.common.enums.AuditOutcome;
 import com.ingoboka_api.v1.common.enums.QuoteStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.enums.ConsentType;
@@ -46,7 +48,6 @@ import java.time.LocalDate;
 import java.time.Period;
 import java.time.temporal.ChronoUnit;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
-import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -424,7 +425,14 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             policyIssuanceService.issueFromApprovedApplication(application);
         }
 
+        AuditOutcome outcome = switch (request.getStatus()) {
+            case APPROVED -> AuditOutcome.SUCCESS;
+            case REJECTED -> AuditOutcome.FAILED;
+            case UNDER_REVIEW -> AuditOutcome.PENDING;
+            default -> AuditOutcome.SUCCESS;
+        };
         auditComplianceService.log(
+                outcome,
                 "APPLICATION_REVIEWED",
                 "APPLICATION",
                 application.getId(),

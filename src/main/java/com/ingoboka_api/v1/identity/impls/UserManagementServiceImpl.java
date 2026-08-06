@@ -27,6 +27,7 @@ import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.identity.services.NotificationService;
 import com.ingoboka_api.v1.identity.services.StaffProvisioningService;
 import com.ingoboka_api.v1.identity.services.UserManagementService;
+import com.ingoboka_api.v1.identity.util.UserProfileMapper;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -54,6 +55,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final NotificationService notificationService;
     private final PasswordEncoder passwordEncoder;
     private final AuditComplianceService auditComplianceService;
+    private final UserProfileMapper userProfileMapper;
 
     @Override
     @Transactional(readOnly = true)
@@ -188,7 +190,6 @@ public class UserManagementServiceImpl implements UserManagementService {
             throw new BusinessException("Invalid user status");
         }
         User user = requireUser(userId);
-        rejectCitizenAccount(user);
         user.setStatus(request.getStatus());
         user.setUpdatedAt(Instant.now());
         User saved = userRepository.save(user);
@@ -312,6 +313,7 @@ public class UserManagementServiceImpl implements UserManagementService {
                 .cell(user.getCell())
                 .village(user.getVillage())
                 .country(user.getCountry())
+                .profilePictureUrl(userProfileMapper.resolveProfilePictureUrl(user))
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

@@ -13,6 +13,7 @@ import com.ingoboka_api.v1.claim.repositories.ClaimRepository;
 import com.ingoboka_api.v1.claim.repositories.ClaimStatusHistoryRepository;
 import com.ingoboka_api.v1.claim.services.ClaimService;
 import com.ingoboka_api.v1.common.enums.AppealStatus;
+import com.ingoboka_api.v1.common.enums.AuditOutcome;
 import com.ingoboka_api.v1.common.enums.ClaimDecisionType;
 import com.ingoboka_api.v1.common.enums.ClaimStatus;
 import com.ingoboka_api.v1.common.enums.DocumentAccessClassification;
@@ -294,7 +295,25 @@ public class ClaimServiceImpl implements ClaimService {
                 "claimNumber", claim.getClaimNumber(),
                 "decision", decisionLabel,
                 "notes", request.getReason() != null ? request.getReason() : ""));
+        if (request.getDecision() == ClaimDecisionType.APPROVED
+                || request.getDecision() == ClaimDecisionType.PARTIAL) {
+            notifyClaimholder(claim, "PAYOUT_READY", Map.of(
+                    "policyNumber",
+                    policyRepository
+                            .findById(claim.getPolicyId())
+                            .map(p -> p.getPolicyNumber())
+                            .orElse(""),
+                    "amount",
+                    request.getApprovedAmount() != null
+                            ? request.getApprovedAmount().toPlainString()
+                            : claim.getClaimedAmount().toPlainString(),
+                    "currency", claim.getCurrency()));
+        }
+        AuditOutcome outcome = request.getDecision() == ClaimDecisionType.REJECTED
+                ? AuditOutcome.FAILED
+                : AuditOutcome.SUCCESS;
         auditComplianceService.log(
+                outcome,
                 "CLAIM_DECISION_RECORDED",
                 "CLAIM",
                 claim.getId(),
@@ -453,12 +472,12 @@ public class ClaimServiceImpl implements ClaimService {
     private void notifyClaimholder(Claim claim, String templateCode, Map<String, String> variables) {
         citizenProfileRepository.findById(claim.getCitizenProfileId()).ifPresent(profile -> userRepository
                 .findById(profile.getUserId())
-                .ifPresent(user -> notificationTemplateService.sendTemplated(
+                .ifPresent(user -> notificationTemplateService.notifyAllChannels(
                         user.getId(),
                         claim.getOrganizationId(),
                         templateCode,
-                        NotificationChannel.EMAIL,
                         user.getEmail(),
+                        user.getPhoneNumber(),
                         variables)));
     }
 

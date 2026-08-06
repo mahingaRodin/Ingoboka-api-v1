@@ -3,11 +3,14 @@ package com.ingoboka_api.v1.customer.controllers;
 import com.ingoboka_api.v1.common.enums.ConsentType;
 import com.ingoboka_api.v1.common.requests.CreateDependantRequest;
 import com.ingoboka_api.v1.common.requests.GrantConsentRequest;
+import com.ingoboka_api.v1.common.requests.SaveNeedsAssessmentPreferencesRequest;
 import com.ingoboka_api.v1.common.requests.UpdateCitizenProfileRequest;
+import com.ingoboka_api.v1.common.requests.UpdateDependantRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.CitizenProfileResponse;
 import com.ingoboka_api.v1.common.responses.ConsentResponse;
 import com.ingoboka_api.v1.common.responses.DependantResponse;
+import com.ingoboka_api.v1.common.responses.NeedsAssessmentPreferencesResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.customer.services.CustomerProfileService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -70,6 +73,14 @@ public class CustomerProfileController {
         return ApiResponse.ok("Dependant added", customerProfileService.addDependant(request));
     }
 
+    @PutMapping("/dependants/{dependantId}")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "Update dependant")
+    public ApiResponse<DependantResponse> updateDependant(
+            @PathVariable UUID dependantId, @Valid @RequestBody UpdateDependantRequest request) {
+        return ApiResponse.ok("Dependant updated", customerProfileService.updateDependant(dependantId, request));
+    }
+
     @DeleteMapping("/dependants/{dependantId}")
     @PreAuthorize("hasRole('CITIZEN')")
     @Operation(summary = "Remove dependant")
@@ -102,5 +113,22 @@ public class CustomerProfileController {
     public ApiResponse<Void> revokeConsent(@PathVariable ConsentType consentType) {
         customerProfileService.revokeConsent(consentType);
         return ApiResponse.ok("Consent revoked", null);
+    }
+
+    @GetMapping("/preferences/needs-assessment")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "Get saved needs assessment preferences")
+    public ApiResponse<NeedsAssessmentPreferencesResponse> getNeedsAssessmentPreferences() {
+        return ApiResponse.ok(
+                "Needs assessment preferences", customerProfileService.getNeedsAssessmentPreferences());
+    }
+
+    @PostMapping("/preferences/needs-assessment")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "Save needs assessment preferences")
+    public ApiResponse<NeedsAssessmentPreferencesResponse> saveNeedsAssessmentPreferences(
+            @Valid @RequestBody SaveNeedsAssessmentPreferencesRequest request) {
+        return ApiResponse.ok(
+                "Needs assessment saved", customerProfileService.saveNeedsAssessmentPreferences(request));
     }
 }

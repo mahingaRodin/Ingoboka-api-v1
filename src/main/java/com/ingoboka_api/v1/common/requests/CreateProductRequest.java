@@ -16,4 +16,7 @@ public class CreateProductRequest {
 
     @NotBlank(message = "Category is required")
     private String category;
+
+    /** External image URL or MinIO object key for product hero image. */
+    private String heroImageUrl;
 }

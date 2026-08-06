@@ -19,6 +19,7 @@ public class StaffProfileResponse {
     Set<String> roles;
     UUID organizationId;
     String organizationName;
+    String profilePictureUrl;
     Instant createdAt;
     Instant updatedAt;
 }

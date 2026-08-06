@@ -10,9 +10,12 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Setter
@@ -53,6 +56,13 @@ public class CitizenProfile {
     @Enumerated(EnumType.STRING)
     @Column(name = "kyc_status", nullable = false, length = 32)
     private KycStatus kycStatus = KycStatus.PENDING;
+
+    @Column(name = "needs_assessment_completed_at")
+    private Instant needsAssessmentCompletedAt;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "needs_assessment_preferences", columnDefinition = "jsonb")
+    private Map<String, Object> needsAssessmentPreferences;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
