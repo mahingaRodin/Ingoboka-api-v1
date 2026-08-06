@@ -1,7 +1,7 @@
 package com.ingoboka_api.v1.partner.controllers;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.UpdateOrganizationSettingsRequest;
@@ -42,7 +42,7 @@ public class PartnerSettingsController {
     private final OrganizationRepository organizationRepository;
     private final PartnerProfileRepository partnerProfileRepository;
     private final AuditComplianceService auditComplianceService;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
     @GetMapping
     @PreAuthorize(
@@ -89,7 +89,7 @@ public class PartnerSettingsController {
         }
         try {
             Map<String, Object> parsed =
-                    objectMapper.readValue(settingsJson, new TypeReference<Map<String, Object>>() {});
+                    jsonMapper.readValue(settingsJson, new TypeReference<Map<String, Object>>() {});
             PartnerProfile profile = partnerProfileRepository
                     .findByOrganizationId(orgId)
                     .orElse(null);
@@ -149,7 +149,7 @@ public class PartnerSettingsController {
         Map<String, Object> merged = new LinkedHashMap<>();
         if (StringUtils.hasText(settings.getSettingsJson())) {
             try {
-                merged.putAll(objectMapper.readValue(settings.getSettingsJson(), new TypeReference<>() {}));
+                merged.putAll(jsonMapper.readValue(settings.getSettingsJson(), new TypeReference<>() {}));
             } catch (Exception ignored) {
                 merged.put("settingsJson", settings.getSettingsJson());
             }
@@ -166,7 +166,7 @@ public class PartnerSettingsController {
         }
         String enrichedJson;
         try {
-            enrichedJson = objectMapper.writeValueAsString(merged);
+            enrichedJson = jsonMapper.writeValueAsString(merged);
         } catch (Exception ex) {
             enrichedJson = settings.getSettingsJson();
         }
