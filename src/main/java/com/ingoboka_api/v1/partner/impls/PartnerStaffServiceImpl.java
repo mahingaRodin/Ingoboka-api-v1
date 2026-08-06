@@ -22,6 +22,7 @@ import com.ingoboka_api.v1.identity.repositories.RoleRepository;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.identity.services.NotificationService;
 import com.ingoboka_api.v1.identity.services.StaffProvisioningService;
+import com.ingoboka_api.v1.partner.services.PartnerStaffService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
