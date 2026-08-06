@@ -222,7 +222,7 @@ public class FrontendCompatController {
     }
 
     @PostMapping("/api/v1/admin/claims/{claimId}/decision")
-    @PreAuthorize("hasAnyRole('CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     public ApiResponse<ClaimResponse> adminClaimDecision(
             @PathVariable UUID claimId, @RequestBody Map<String, Object> payload) {

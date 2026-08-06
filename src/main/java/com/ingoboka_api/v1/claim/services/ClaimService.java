@@ -19,6 +19,8 @@ public interface ClaimService {
 
     ClaimResponse submitClaim(UUID claimId);
 
+    ClaimResponse cancelClaim(UUID claimId);
+
     ClaimResponse getClaim(UUID claimId);
 
     PageResponse<ClaimResponse> listMyClaims(int page, int size);

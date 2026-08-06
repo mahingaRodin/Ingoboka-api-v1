@@ -87,11 +87,18 @@ public class ClaimController {
     }
 
     @PostMapping("/{claimId}/decision")
-    @PreAuthorize("hasAnyRole('CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
     @Operation(summary = "Record claim decision")
     public ApiResponse<ClaimResponse> recordDecision(
             @PathVariable UUID claimId, @Valid @RequestBody RecordClaimDecisionRequest request) {
         return ApiResponse.ok("Decision recorded", claimService.recordDecision(claimId, request));
+    }
+
+    @PostMapping("/{claimId}/cancel")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "Cancel a pending claim")
+    public ApiResponse<ClaimResponse> cancelClaim(@PathVariable UUID claimId) {
+        return ApiResponse.ok("Claim cancelled", claimService.cancelClaim(claimId));
     }
 
     @PostMapping("/{claimId}/documents")

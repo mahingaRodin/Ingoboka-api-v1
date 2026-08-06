@@ -7,6 +7,7 @@ public enum ClaimStatus {
     INFORMATION_REQUIRED,
     APPROVED,
     REJECTED,
+    CANCELLED,
     PAYMENT_PROCESSING,
     PAID
 }
