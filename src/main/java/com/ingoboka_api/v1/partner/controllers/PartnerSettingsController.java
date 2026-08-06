@@ -1,5 +1,6 @@
 package com.ingoboka_api.v1.partner.controllers;
 
+import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.UpdateOrganizationSettingsRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PartnerSettingsController {
 
     private final OrganizationSettingsRepository organizationSettingsRepository;
+    private final AuditComplianceService auditComplianceService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('PARTNER_ADMIN', 'PLATFORM_ADMIN')")
@@ -47,6 +49,11 @@ public class PartnerSettingsController {
         settings.setSettingsJson(request.getSettingsJson());
         settings.setUpdatedAt(Instant.now());
         organizationSettingsRepository.save(settings);
+        auditComplianceService.log(
+                "ORG_SETTINGS_UPDATED",
+                "ORGANIZATION_SETTINGS",
+                settings.getOrganizationId(),
+                "Organization settings updated");
         return ApiResponse.ok("Settings updated", toResponse(settings));
     }
 

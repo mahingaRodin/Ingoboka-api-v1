@@ -1,5 +1,6 @@
 package com.ingoboka_api.v1.partner.impls;
 
+import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import com.ingoboka_api.v1.common.enums.OrganizationType;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.OnboardPartnerRequest;
@@ -31,6 +32,7 @@ public class PartnerServiceImpl implements PartnerService {
     private final OrganizationManagementService organizationManagementService;
     private final StaffProvisioningService staffProvisioningService;
     private final PartnerProfileRepository partnerProfileRepository;
+    private final AuditComplianceService auditComplianceService;
 
     @Override
     @Transactional
@@ -53,6 +55,12 @@ public class PartnerServiceImpl implements PartnerService {
                 request.getAdminLastName(),
                 RoleCodes.PARTNER_ADMIN,
                 request.getAdminDefaultPassword());
+
+        auditComplianceService.log(
+                "PARTNER_ONBOARDED",
+                "ORGANIZATION",
+                organization.getId(),
+                "Onboarded partner " + organization.getName());
 
         return OnboardPartnerResponse.builder()
                 .partner(toResponse(organization, profile))
@@ -100,6 +108,9 @@ public class PartnerServiceImpl implements PartnerService {
         profile.setUpdatedAt(Instant.now());
         partnerProfileRepository.save(profile);
 
+        auditComplianceService.log(
+                "PARTNER_UPDATED", "ORGANIZATION", partnerId, "Updated partner " + organization.getName());
+
         return toResponse(organization, profile);
     }
 
@@ -115,6 +126,12 @@ public class PartnerServiceImpl implements PartnerService {
         PartnerProfile profile = partnerProfileRepository
                 .findByOrganizationId(partnerId)
                 .orElseGet(() -> createEmptyProfile(partnerId));
+
+        auditComplianceService.log(
+                "PARTNER_STATUS_CHANGED",
+                "ORGANIZATION",
+                partnerId,
+                "Partner status set to " + request.getStatus());
 
         return toResponse(organization, profile);
     }

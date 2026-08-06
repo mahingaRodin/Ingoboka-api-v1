@@ -17,5 +17,6 @@ public class AuditLogResponse {
     UUID entityId;
     String correlationId;
     String summary;
+    String outcome;
     Instant createdAt;
 }

@@ -1,5 +1,6 @@
 package com.ingoboka_api.v1.identity.impls;
 
+import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import com.ingoboka_api.v1.common.enums.RoleScope;
 import com.ingoboka_api.v1.common.enums.UserStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
@@ -52,6 +53,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final StaffProvisioningService staffProvisioningService;
     private final NotificationService notificationService;
     private final PasswordEncoder passwordEncoder;
+    private final AuditComplianceService auditComplianceService;
 
     @Override
     @Transactional(readOnly = true)
@@ -112,7 +114,10 @@ public class UserManagementServiceImpl implements UserManagementService {
         user.setVillage(request.getVillage());
         user.setCountry("Rwanda");
         user.setUpdatedAt(Instant.now());
-        return toResponse(userRepository.save(user));
+        ManagedUserResponse response = toResponse(userRepository.save(user));
+        auditComplianceService.log(
+                "USER_CREATED", "USER", user.getId(), "Created user " + user.getEmail() + " as " + request.getRoleCode());
+        return response;
     }
 
     @Override
@@ -152,7 +157,9 @@ public class UserManagementServiceImpl implements UserManagementService {
             user.setVillage(request.getVillage());
         }
         user.setUpdatedAt(Instant.now());
-        return toResponse(userRepository.save(user));
+        ManagedUserResponse response = toResponse(userRepository.save(user));
+        auditComplianceService.log("USER_UPDATED", "USER", user.getId(), "Updated user profile " + user.getEmail());
+        return response;
     }
 
     @Override
@@ -167,7 +174,10 @@ public class UserManagementServiceImpl implements UserManagementService {
         user.getRoles().clear();
         user.getRoles().add(role);
         user.setUpdatedAt(Instant.now());
-        return toResponse(userRepository.save(user));
+        ManagedUserResponse response = toResponse(userRepository.save(user));
+        auditComplianceService.log(
+                "USER_ROLE_UPDATED", "USER", user.getId(), "Role set to " + request.getRoleCode());
+        return response;
     }
 
     @Override
@@ -183,7 +193,13 @@ public class UserManagementServiceImpl implements UserManagementService {
         user.setUpdatedAt(Instant.now());
         User saved = userRepository.save(user);
         revokeRefreshTokensIfInactive(saved);
-        return toResponse(saved);
+        ManagedUserResponse response = toResponse(saved);
+        auditComplianceService.log(
+                "USER_STATUS_CHANGED",
+                "USER",
+                saved.getId(),
+                "Status changed to " + request.getStatus());
+        return response;
     }
 
     @Override
@@ -206,6 +222,7 @@ public class UserManagementServiceImpl implements UserManagementService {
 
         String organizationName = user.getOrganization() != null ? user.getOrganization().getName() : "Ingoboka";
         notificationService.sendStaffWelcomeEmail(user, organizationName, temporaryPassword);
+        auditComplianceService.log("USER_PASSWORD_RESET", "USER", user.getId(), "Password reset for " + user.getEmail());
         return toResponse(user);
     }
 
@@ -219,6 +236,7 @@ public class UserManagementServiceImpl implements UserManagementService {
         user.setUpdatedAt(Instant.now());
         User saved = userRepository.save(user);
         revokeRefreshTokensIfInactive(saved);
+        auditComplianceService.log("USER_DISABLED", "USER", saved.getId(), "User soft-disabled " + saved.getEmail());
     }
 
     private void revokeRefreshTokensIfInactive(User user) {

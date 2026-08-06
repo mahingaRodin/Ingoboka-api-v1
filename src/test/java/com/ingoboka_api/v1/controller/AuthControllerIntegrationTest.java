@@ -47,7 +47,7 @@ class AuthControllerIntegrationTest extends IntegrationTestSupport {
         String nationalId = "119988776655" + randomPhoneSuffix().substring(0, 4);
         String registerBody =
                 """
-                {"fullName":"Test Citizen","phone":"%s","nationalId":"%s","password":"Citizen@Test123","email":"%s"}
+                {"fullName":"Test Citizen","phone":"%s","nationalId":"%s","password":"Citizen@Test123","email":"%s","province":"City of Kigali","district":"Gasabo","sector":"Remera","cell":"Rukiri I","village":"Ubumwe"}
                 """
                         .formatted(phone, nationalId, email);
 
@@ -73,7 +73,7 @@ class AuthControllerIntegrationTest extends IntegrationTestSupport {
         String nationalId = "119988776655" + randomPhoneSuffix().substring(0, 4);
         String registerBody =
                 """
-                {"fullName":"Test Citizen","phone":"%s","nationalId":"%s","password":"Citizen@Test123","email":"%s"}
+                {"fullName":"Test Citizen","phone":"%s","nationalId":"%s","password":"Citizen@Test123","email":"%s","province":"City of Kigali","district":"Nyarugenge","sector":"Gitega","cell":"Akabahizi","village":"Gihanga"}
                 """
                         .formatted(phone, nationalId, email);
 

@@ -42,6 +42,9 @@ public class AuditLog {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String summary;
 
+    @Column(nullable = false, length = 32)
+    private String outcome = "SUCCESS";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 }
