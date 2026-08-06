@@ -98,6 +98,15 @@ public class PartnerPortalController {
                 partnerStaffService.updateStaffStatus(requirePartnerOrganizationId(), userId, request));
     }
 
+    @PostMapping("/staff/{userId}/resend-invite")
+    @PreAuthorize("hasRole('PARTNER_ADMIN')")
+    @Operation(summary = "Resend staff invite", description = "Re-send activation link for pending invitations")
+    public ApiResponse<StaffResponse> resendStaffInvite(@PathVariable UUID userId) {
+        return ApiResponse.ok(
+                "Invitation email sent",
+                partnerStaffService.resendStaffInvite(requirePartnerOrganizationId(), userId));
+    }
+
     @PostMapping("/staff/{userId}/reset-credentials")
     @PreAuthorize("hasRole('PARTNER_ADMIN')")
     @Operation(summary = "Reset staff credentials", description = "Email new temporary password; staff must change it on next login")

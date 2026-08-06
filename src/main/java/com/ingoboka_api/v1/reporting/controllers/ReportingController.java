@@ -28,21 +28,24 @@ public class ReportingController {
     private final ReportingService reportingService;
 
     @GetMapping("/overview")
-    @PreAuthorize("hasAnyRole('PARTNER_ADMIN', 'FINANCE_OFFICER', 'PLATFORM_ADMIN', 'COMPLIANCE_AUDITOR')")
+    @PreAuthorize(
+            "hasAnyRole('PARTNER_ADMIN', 'FINANCE_OFFICER', 'CLAIMS_OFFICER', 'PLATFORM_ADMIN', 'COMPLIANCE_AUDITOR')")
     @Operation(summary = "Tenant-scoped operational summary")
     public ApiResponse<TenantOverviewResponse> overview() {
         return ApiResponse.ok("Overview retrieved", reportingService.getTenantOverview());
     }
 
     @GetMapping("/policies")
-    @PreAuthorize("hasAnyRole('PARTNER_ADMIN', 'FINANCE_OFFICER', 'PLATFORM_ADMIN', 'COMPLIANCE_AUDITOR')")
+    @PreAuthorize(
+            "hasAnyRole('PARTNER_ADMIN', 'FINANCE_OFFICER', 'CLAIMS_OFFICER', 'PLATFORM_ADMIN', 'COMPLIANCE_AUDITOR')")
     public ApiResponse<PageResponse<?>> policyReport(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok("Policy report", reportingService.getPolicyReport(page, size));
     }
 
     @GetMapping("/policies/summary")
-    @PreAuthorize("hasAnyRole('PARTNER_ADMIN', 'FINANCE_OFFICER', 'PLATFORM_ADMIN', 'COMPLIANCE_AUDITOR')")
+    @PreAuthorize(
+            "hasAnyRole('PARTNER_ADMIN', 'FINANCE_OFFICER', 'CLAIMS_OFFICER', 'PLATFORM_ADMIN', 'COMPLIANCE_AUDITOR')")
     @Operation(summary = "Policy report aggregate stats for insurer dashboard")
     public ApiResponse<PolicyReportSummaryResponse> policyReportSummary() {
         return ApiResponse.ok("Policy summary", reportingService.getPolicyReportSummary());

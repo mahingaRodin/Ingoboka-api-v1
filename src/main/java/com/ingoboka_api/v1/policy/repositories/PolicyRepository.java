@@ -40,4 +40,28 @@ public interface PolicyRepository extends JpaRepository<Policy, UUID> {
     List<Policy> findByStatus(PolicyStatus status);
 
     List<Policy> findByStatusAndEndDateBefore(PolicyStatus status, LocalDate date);
+
+    @Query(
+            """
+            SELECT cp.district, COUNT(DISTINCT p.citizenProfileId)
+            FROM Policy p
+            JOIN CitizenProfile cp ON cp.id = p.citizenProfileId
+            WHERE p.organizationId = :organizationId AND p.status = :status AND cp.district IS NOT NULL
+            GROUP BY cp.district
+            """)
+    List<Object[]> countEnrolledByDistrict(
+            @Param("organizationId") UUID organizationId, @Param("status") PolicyStatus status);
+
+    @Query(
+            """
+            SELECT prod.name, COUNT(DISTINCT p.citizenProfileId)
+            FROM Policy p
+            JOIN ProductPlan plan ON plan.id = p.productPlanId
+            JOIN InsuranceProduct prod ON prod.id = plan.productId
+            WHERE p.organizationId = :organizationId AND p.status = :status
+            GROUP BY prod.name
+            ORDER BY COUNT(DISTINCT p.citizenProfileId) DESC
+            """)
+    List<Object[]> countEnrolledByProduct(
+            @Param("organizationId") UUID organizationId, @Param("status") PolicyStatus status);
 }

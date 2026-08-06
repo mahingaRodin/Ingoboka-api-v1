@@ -11,6 +11,7 @@ public class PartnerStaffOverviewResponse {
     long totalStaff;
     long pendingPasswordChange;
     long pendingEmailVerification;
+    long pendingInvites;
     long activeStaff;
     long disabledOrLocked;
     List<StaffResponse> staff;

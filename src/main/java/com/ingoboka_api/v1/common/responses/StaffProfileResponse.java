@@ -1,6 +1,5 @@
 package com.ingoboka_api.v1.common.responses;
 
-import com.ingoboka_api.v1.common.enums.UserStatus;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
@@ -9,16 +8,17 @@ import lombok.Value;
 
 @Value
 @Builder
-public class StaffResponse {
+public class StaffProfileResponse {
     UUID id;
     String email;
     String phoneNumber;
     String firstName;
     String lastName;
-    UserStatus status;
+    String status;
     boolean emailVerified;
-    boolean mustChangePassword;
     Set<String> roles;
-    String enrollmentStatus;
+    UUID organizationId;
+    String organizationName;
     Instant createdAt;
+    Instant updatedAt;
 }

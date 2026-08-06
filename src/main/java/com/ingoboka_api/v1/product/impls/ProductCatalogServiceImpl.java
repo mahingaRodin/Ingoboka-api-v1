@@ -84,6 +84,9 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
         if (product.getStatus() == ProductStatus.ARCHIVED) {
             throw new BusinessException("Archived products cannot be published");
         }
+        if (product.getStatus() == ProductStatus.PUBLISHED) {
+            throw new BusinessException("Product is already published");
+        }
         product.setStatus(ProductStatus.PUBLISHED);
         product.setPublishedAt(Instant.now());
         product.setUpdatedAt(Instant.now());

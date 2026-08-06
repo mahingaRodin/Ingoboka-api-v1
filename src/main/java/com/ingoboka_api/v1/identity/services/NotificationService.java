@@ -12,5 +12,7 @@ public interface NotificationService {
 
     void sendStaffWelcomeEmail(User user, String organizationName, String temporaryPassword);
 
+    void sendStaffInviteEmail(User user, String organizationName, String inviterName, String activationToken);
+
     void sendOtpEmail(String email, String otp, int expirationMinutes);
 }

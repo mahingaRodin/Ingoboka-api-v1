@@ -9,6 +9,8 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ClaimRepository extends JpaRepository<Claim, UUID> {
 
@@ -28,4 +30,24 @@ public interface ClaimRepository extends JpaRepository<Claim, UUID> {
     Optional<Claim> findByClaimNumber(String claimNumber);
 
     long countByOrganizationIdAndStatusIn(UUID organizationId, Collection<ClaimStatus> statuses);
+
+    @Query(
+            """
+            SELECT c FROM Claim c
+            LEFT JOIN CitizenProfile cp ON cp.id = c.citizenProfileId
+            WHERE c.organizationId = :organizationId
+            AND (:status IS NULL OR c.status = :status)
+            AND (:search IS NULL OR :search = '' OR LOWER(c.claimNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(c.description) LIKE LOWER(CONCAT('%', :search, '%')))
+            AND (:district IS NULL OR :district = '' OR cp.district = :district)
+            AND (:province IS NULL OR :province = '' OR cp.district IN :districtsInProvince)
+            """)
+    Page<Claim> findTenantClaimsFiltered(
+            @Param("organizationId") UUID organizationId,
+            @Param("status") ClaimStatus status,
+            @Param("search") String search,
+            @Param("district") String district,
+            @Param("province") String province,
+            @Param("districtsInProvince") Collection<String> districtsInProvince,
+            Pageable pageable);
 }

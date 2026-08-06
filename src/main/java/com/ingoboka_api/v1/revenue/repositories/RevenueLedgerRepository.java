@@ -14,6 +14,8 @@ public interface RevenueLedgerRepository extends JpaRepository<RevenueLedgerEntr
 
     Page<RevenueLedgerEntry> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId, Pageable pageable);
 
+    java.util.List<RevenueLedgerEntry> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
+
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM RevenueLedgerEntry e "
             + "WHERE e.organizationId = :organizationId AND e.status = :status")
     BigDecimal sumAmountByOrganizationIdAndStatus(

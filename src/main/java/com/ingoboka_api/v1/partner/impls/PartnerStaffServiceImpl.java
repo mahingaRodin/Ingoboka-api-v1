@@ -1,5 +1,6 @@
 package com.ingoboka_api.v1.partner.impls;
 
+import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import com.ingoboka_api.v1.common.enums.UserStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.CreateStaffRequest;
@@ -46,6 +47,7 @@ public class PartnerStaffServiceImpl implements PartnerStaffService {
     private final RoleRepository roleRepository;
     private final NotificationService notificationService;
     private final PasswordEncoder passwordEncoder;
+    private final AuditComplianceService auditComplianceService;
 
     @Override
     @Transactional
@@ -58,14 +60,59 @@ public class PartnerStaffServiceImpl implements PartnerStaffService {
             throw new BusinessException("Invalid role for staff member");
         }
 
-        return staffProvisioningService.createStaffMemberWithDefaultPassword(
-                partnerId,
-                request.getEmail(),
-                request.getPhoneNumber(),
-                request.getFirstName(),
-                request.getLastName(),
-                request.getRoleCode(),
-                request.getDefaultPassword());
+        StaffCreatedResponse created;
+        if (request.isInviteOnly()) {
+            String inviterName = SecurityUtils.currentUser().getEmail();
+            created = staffProvisioningService.createStaffMemberWithInvite(
+                    partnerId,
+                    request.getEmail(),
+                    request.getPhoneNumber(),
+                    request.getFirstName(),
+                    request.getLastName(),
+                    request.getRoleCode(),
+                    inviterName);
+            auditComplianceService.log(
+                    "STAFF_INVITED",
+                    "USER",
+                    created.getUserId(),
+                    "Invited staff member " + request.getEmail() + " with role " + request.getRoleCode());
+        } else {
+            created = staffProvisioningService.createStaffMemberWithDefaultPassword(
+                    partnerId,
+                    request.getEmail(),
+                    request.getPhoneNumber(),
+                    request.getFirstName(),
+                    request.getLastName(),
+                    request.getRoleCode(),
+                    request.getDefaultPassword());
+            auditComplianceService.log(
+                    "STAFF_CREATED",
+                    "USER",
+                    created.getUserId(),
+                    "Created staff member " + request.getEmail() + " with role " + request.getRoleCode());
+        }
+        return created;
+    }
+
+    @Override
+    @Transactional
+    public StaffResponse resendStaffInvite(UUID partnerId, UUID userId) {
+        assertCanManageStaff(partnerId);
+        User user = requireStaffMember(partnerId, userId);
+
+        if (user.getStatus() != UserStatus.PENDING_ACTIVATION) {
+            throw new BusinessException("Invite can only be resent for pending invitations");
+        }
+
+        String inviterName = SecurityUtils.currentUser().getEmail();
+        String organizationName =
+                user.getOrganization() != null ? user.getOrganization().getName() : "Partner";
+        String activationToken = staffProvisioningService.issueActivationToken(user);
+        notificationService.sendStaffInviteEmail(user, organizationName, inviterName, activationToken);
+
+        auditComplianceService.log(
+                "STAFF_INVITE_RESENT", "USER", user.getId(), "Resent invite to " + user.getEmail());
+        return toResponse(user);
     }
 
     @Override
@@ -188,6 +235,9 @@ public class PartnerStaffServiceImpl implements PartnerStaffService {
         assertCanManageStaff(partnerId);
         PageResponse<StaffResponse> page = listStaff(partnerId, 0, 500);
         List<StaffResponse> staff = page.getContent();
+        long pendingInvites = staff.stream()
+                .filter(member -> member.getStatus() == UserStatus.PENDING_ACTIVATION)
+                .count();
         long pendingPassword = staff.stream()
                 .filter(member -> member.isMustChangePassword()
                         || member.getStatus() == UserStatus.PENDING_PASSWORD_CHANGE)
@@ -204,6 +254,7 @@ public class PartnerStaffServiceImpl implements PartnerStaffService {
 
         return PartnerStaffOverviewResponse.builder()
                 .totalStaff(staff.size())
+                .pendingInvites(pendingInvites)
                 .pendingPasswordChange(pendingPassword)
                 .pendingEmailVerification(pendingEmail)
                 .activeStaff(active)
@@ -223,8 +274,22 @@ public class PartnerStaffServiceImpl implements PartnerStaffService {
                 .emailVerified(user.isEmailVerified())
                 .mustChangePassword(user.isMustChangePassword())
                 .roles(user.getRoles().stream().map(Role::getCode).collect(Collectors.toSet()))
+                .enrollmentStatus(deriveEnrollmentStatus(user))
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    static String deriveEnrollmentStatus(User user) {
+        if (user.getStatus() == UserStatus.DISABLED || user.getStatus() == UserStatus.LOCKED) {
+            return "DISABLED";
+        }
+        if (user.getStatus() == UserStatus.ACTIVE && user.isEmailVerified()) {
+            return "COMPLETED";
+        }
+        if (user.getStatus() == UserStatus.ACTIVE) {
+            return "COMPLETED";
+        }
+        return "PENDING";
     }
 
     private User requireStaffMember(UUID partnerId, UUID userId) {

@@ -50,7 +50,8 @@ public class ProductController {
     }
 
     @GetMapping("/tenant")
-    @PreAuthorize("hasAnyRole('INSURER_PRODUCT_MANAGER', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
+    @PreAuthorize(
+            "hasAnyRole('INSURER_PRODUCT_MANAGER', 'PARTNER_ADMIN', 'CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PLATFORM_ADMIN')")
     @Operation(summary = "List tenant products", description = "All products for the authenticated insurer tenant")
     public ApiResponse<PageResponse<ProductResponse>> listTenantProducts(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {

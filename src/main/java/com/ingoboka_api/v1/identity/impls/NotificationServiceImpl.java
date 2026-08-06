@@ -76,6 +76,21 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    public void sendStaffInviteEmail(
+            User user, String organizationName, String inviterName, String activationToken) {
+        sendTemplatedEmail(
+                user.getEmail(),
+                "staff-invite",
+                Map.of(
+                        "fullName", user.getFirstName() + " " + user.getLastName(),
+                        "organizationName", organizationName,
+                        "inviterName", inviterName != null ? inviterName : "Your administrator",
+                        "activateUrl",
+                                platformProperties.getFrontendActivateAccountUrl() + "?token=" + activationToken,
+                        "hours", String.valueOf(securityProperties.getActivationTokenExpirationHours())));
+    }
+
+    @Override
     public void sendOtpEmail(String email, String otp, int expirationMinutes) {
         sendTemplatedEmail(
                 email, "otp-verification", Map.of("otp", otp, "minutes", String.valueOf(expirationMinutes)));

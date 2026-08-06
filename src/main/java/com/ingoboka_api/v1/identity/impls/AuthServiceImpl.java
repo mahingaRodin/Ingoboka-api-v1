@@ -379,6 +379,8 @@ public class AuthServiceImpl implements AuthService {
         user.setUpdatedAt(Instant.now());
         consumeToken(token);
         userRepository.save(user);
+        auditComplianceService.log(
+                "ACCOUNT_ACTIVATED", "USER", user.getId(), "Staff account activated via invite link");
     }
 
     @Override

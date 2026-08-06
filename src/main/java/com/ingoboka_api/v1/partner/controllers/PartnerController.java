@@ -52,8 +52,9 @@ public class PartnerController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasRole('PARTNER_ADMIN')")
-    @Operation(summary = "Get my partner organization", description = "Partner admin views own tenant profile")
+    @PreAuthorize(
+            "hasAnyRole('PARTNER_ADMIN', 'CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'FINANCE_OFFICER', 'UNDERWRITER')")
+    @Operation(summary = "Get my partner organization", description = "Partner staff views own tenant profile")
     public ApiResponse<PartnerResponse> getMyPartner() {
         return ApiResponse.ok("Partner retrieved", partnerService.getMyPartner());
     }

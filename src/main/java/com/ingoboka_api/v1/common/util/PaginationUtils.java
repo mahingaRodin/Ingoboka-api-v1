@@ -22,6 +22,11 @@ public final class PaginationUtils {
         return PageRequest.of(normalizePage(page), normalizeSize(size), Sort.by(Sort.Direction.DESC, sortField));
     }
 
+    public static Pageable toPageable(int page, int size, String sortField, String sortDir) {
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        return PageRequest.of(normalizePage(page), normalizeSize(size), Sort.by(direction, sortField));
+    }
+
     public static int normalizePage(int page) {
         return Math.max(page, 0);
     }
