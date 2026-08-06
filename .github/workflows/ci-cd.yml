@@ -54,7 +54,7 @@ jobs:
           cache: maven
 
       - name: Pre-pull Testcontainers images (main only)
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
         run: |
           docker pull postgres:16-alpine
           docker pull redis:7-alpine
@@ -63,7 +63,7 @@ jobs:
         run: |
           MVN="./mvnw -B verify -T 1C"
           MVN="$MVN -Dsurefire.skipAfterFailureCount=1"
-          if [ "${{ github.event_name }}" = "push" ] && { [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ github.ref }}" = "refs/heads/staging" ]; }; then
+          if { [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; } && { [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ github.ref }}" = "refs/heads/staging" ]; }; then
             echo "Main/staging: running unit + Testcontainers integration tests"
             $MVN -Dintegration=true
           else
@@ -79,12 +79,12 @@ jobs:
           path: target/surefire-reports/
 
       - name: Build Docker image (sanity check)
-        if: success() && github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+        if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
         run: docker build -t ingoboka-api:${{ github.sha }} .
 
   deploy:
     needs: build-and-test
-    if: success() && github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
