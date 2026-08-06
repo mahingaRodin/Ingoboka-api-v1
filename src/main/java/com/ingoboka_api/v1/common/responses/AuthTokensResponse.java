@@ -35,5 +35,6 @@ public class AuthTokensResponse {
         boolean emailVerified;
         boolean requiresEmailVerification;
         boolean accountActive;
+        String profilePictureUrl;
     }
 }

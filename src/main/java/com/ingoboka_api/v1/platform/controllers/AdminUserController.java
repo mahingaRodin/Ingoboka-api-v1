@@ -83,7 +83,7 @@ public class AdminUserController {
 
     @PatchMapping("/{userId}/status")
     @PreAuthorize("hasRole('PLATFORM_ADMIN')")
-    @Operation(summary = "Update user status")
+    @Operation(summary = "Update user status", description = "Sets ACTIVE, DISABLED, or LOCKED for any managed user account")
     public ApiResponse<ManagedUserResponse> updateUserStatus(
             @PathVariable UUID userId, @Valid @RequestBody UpdateStaffStatusRequest request) {
         return ApiResponse.ok("User status updated", userManagementService.updateUserStatus(userId, request));

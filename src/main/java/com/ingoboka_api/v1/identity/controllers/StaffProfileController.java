@@ -9,6 +9,8 @@ import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.identity.models.Role;
 import com.ingoboka_api.v1.identity.models.User;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
+import com.ingoboka_api.v1.identity.services.UserProfilePictureService;
+import com.ingoboka_api.v1.identity.util.UserProfileMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,6 +35,8 @@ public class StaffProfileController {
 
     private final UserRepository userRepository;
     private final AuditComplianceService auditComplianceService;
+    private final UserProfileMapper userProfileMapper;
+    private final UserProfilePictureService userProfilePictureService;
 
     @GetMapping("/me")
     @PreAuthorize(
@@ -68,11 +72,14 @@ public class StaffProfileController {
         if (request.getPhoneNumber() != null) {
             user.setPhoneNumber(request.getPhoneNumber());
         }
+        if (StringUtils.hasText(request.getProfilePictureUrl())) {
+            userProfilePictureService.applyProfilePictureUrl(user.getId(), request.getProfilePictureUrl());
+        }
         user.setUpdatedAt(Instant.now());
-        User saved = userRepository.save(user);
+        userRepository.save(user);
 
-        auditComplianceService.log("STAFF_PROFILE_UPDATED", "USER", saved.getId(), "Updated staff profile");
-        return ApiResponse.ok("Profile updated", toResponse(saved));
+        auditComplianceService.log("STAFF_PROFILE_UPDATED", "USER", user.getId(), "Updated staff profile");
+        return ApiResponse.ok("Profile updated", toResponse(requireCurrentStaff()));
     }
 
     private User requireCurrentStaff() {
@@ -93,6 +100,7 @@ public class StaffProfileController {
                 .roles(user.getRoles().stream().map(Role::getCode).collect(Collectors.toSet()))
                 .organizationId(user.getOrganization() != null ? user.getOrganization().getId() : null)
                 .organizationName(user.getOrganization() != null ? user.getOrganization().getName() : null)
+                .profilePictureUrl(userProfileMapper.resolveProfilePictureUrl(user))
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

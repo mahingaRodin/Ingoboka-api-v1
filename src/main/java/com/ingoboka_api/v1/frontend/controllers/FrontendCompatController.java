@@ -93,12 +93,37 @@ public class FrontendCompatController {
         return ApiResponse.ok("Dependant added", customerProfileService.addDependant(request));
     }
 
+    @PutMapping("/api/v1/customer/dependants/{dependantId}")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<DependantResponse> updateCustomerDependant(
+            @PathVariable UUID dependantId, @Valid @RequestBody UpdateDependantRequest request) {
+        return ApiResponse.ok("Dependant updated", customerProfileService.updateDependant(dependantId, request));
+    }
+
     @DeleteMapping("/api/v1/customer/dependants/{dependantId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('CITIZEN')")
     @SecurityRequirement(name = "bearerAuth")
     public void removeCustomerDependant(@PathVariable UUID dependantId) {
         customerProfileService.removeDependant(dependantId);
+    }
+
+    @GetMapping("/api/v1/customer/preferences/needs-assessment")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<NeedsAssessmentPreferencesResponse> getNeedsAssessmentPreferencesAlias() {
+        return ApiResponse.ok(
+                "Needs assessment preferences", customerProfileService.getNeedsAssessmentPreferences());
+    }
+
+    @PostMapping("/api/v1/customer/preferences/needs-assessment")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<NeedsAssessmentPreferencesResponse> saveNeedsAssessmentPreferencesAlias(
+            @Valid @RequestBody SaveNeedsAssessmentPreferencesRequest request) {
+        return ApiResponse.ok(
+                "Needs assessment saved", customerProfileService.saveNeedsAssessmentPreferences(request));
     }
 
     @PostMapping("/api/v1/payments/initiate")

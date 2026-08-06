@@ -29,6 +29,7 @@ public class ManagedUserResponse {
     String cell;
     String village;
     String country;
+    String profilePictureUrl;
     Instant createdAt;
     Instant updatedAt;
 }

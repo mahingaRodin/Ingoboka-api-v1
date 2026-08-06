@@ -13,4 +13,12 @@ public interface NotificationTemplateService {
             NotificationChannel channel,
             String recipientEmail,
             Map<String, String> variables);
+
+    void notifyAllChannels(
+            UUID userId,
+            UUID organizationId,
+            String templateCode,
+            String email,
+            String phone,
+            Map<String, String> variables);
 }

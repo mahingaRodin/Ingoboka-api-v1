@@ -1,9 +1,14 @@
 package com.ingoboka_api.v1.common.exception;
 
+import com.ingoboka_api.v1.audit.services.AuditComplianceService;
+import com.ingoboka_api.v1.common.enums.AuditOutcome;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
+import com.ingoboka_api.v1.common.security.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.stream.Collectors;
+import com.ingoboka_api.v1.platform.services.PlatformSettingsService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -22,7 +27,11 @@ import org.springframework.web.context.request.async.AsyncRequestNotUsableExcept
 
 @Slf4j
 @RestControllerAdvice
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+
+    private final PlatformSettingsService platformSettingsService;
+    private final AuditComplianceService auditComplianceService;
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
@@ -53,8 +62,30 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({DisabledException.class, LockedException.class})
     public ResponseEntity<ApiResponse<Void>> handleAccountState(RuntimeException ex) {
+        if (ex instanceof DisabledException) {
+            var config = platformSettingsService.getEffectiveConfig();
+            String message = String.format(
+                    "Your account has been deactivated. Contact support at %s or %s for assistance.",
+                    config.getSupportEmail(), config.getSupportPhone());
+            auditComplianceService.logSystem(
+                    AuditOutcome.FAILED,
+                    "USER_LOGIN_FAILED",
+                    "USER",
+                    null,
+                    "Account deactivated",
+                    "unknown");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error(message, "ACCOUNT_DISABLED"));
+        }
+        auditComplianceService.logSystem(
+                AuditOutcome.FAILED,
+                "USER_LOGIN_FAILED",
+                "USER",
+                null,
+                ex.getMessage() != null ? ex.getMessage() : "Account locked",
+                "unknown");
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error(ex.getMessage()));
+                .body(ApiResponse.error(ex.getMessage(), "ACCOUNT_LOCKED"));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -62,6 +93,13 @@ public class GlobalExceptionHandler {
         String message = ex.getMessage() != null && !ex.getMessage().isBlank()
                 ? ex.getMessage()
                 : "Access denied";
+        auditComplianceService.logSystem(
+                AuditOutcome.FAILED,
+                "ACCESS_DENIED",
+                "REQUEST",
+                null,
+                message,
+                safeActorEmail());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error(message, "ACCESS_DENIED"));
     }
@@ -129,5 +167,13 @@ public class GlobalExceptionHandler {
             current = current.getCause();
         }
         return false;
+    }
+
+    private String safeActorEmail() {
+        try {
+            return SecurityUtils.currentUser().getEmail();
+        } catch (Exception ex) {
+            return "unknown";
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.ingoboka_api.v1.identity.impls;
 
 import com.ingoboka_api.v1.audit.services.AuditComplianceService;
+import com.ingoboka_api.v1.common.enums.AuditOutcome;
 import com.ingoboka_api.v1.common.config.OtpDeliveryProperties;
 import com.ingoboka_api.v1.common.enums.OtpDeliveryChannel;
 import com.ingoboka_api.v1.common.config.JwtProperties;
@@ -27,6 +28,8 @@ import com.ingoboka_api.v1.identity.repositories.VerificationTokenRepository;
 import com.ingoboka_api.v1.identity.services.AuthService;
 import com.ingoboka_api.v1.identity.services.NotificationService;
 import com.ingoboka_api.v1.identity.services.OtpService;
+import com.ingoboka_api.v1.identity.services.UserProfilePictureService;
+import com.ingoboka_api.v1.identity.util.UserProfileMapper;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.identity.models.RefreshToken;
 import com.ingoboka_api.v1.identity.models.Role;
@@ -41,6 +44,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,6 +83,8 @@ public class AuthServiceImpl implements AuthService {
     private final OtpDeliveryProperties otpDeliveryProperties;
     private final AuditComplianceService auditComplianceService;
     private final PlatformSettingsService platformSettingsService;
+    private final UserProfilePictureService userProfilePictureService;
+    private final UserProfileMapper userProfileMapper;
 
     private static final String OTP_PURPOSE_SIGNUP = "SIGNUP";
     private static final String SYNTHETIC_EMAIL_DOMAIN = "@phone.ingoboka.rw";
@@ -151,6 +157,10 @@ public class AuthServiceImpl implements AuthService {
         user.setUpdatedAt(now);
         user.getRoles().add(citizenRole);
         userRepository.save(user);
+
+        if (StringUtils.hasText(request.getProfilePictureUrl())) {
+            userProfilePictureService.applyProfilePictureUrl(user.getId(), request.getProfilePictureUrl());
+        }
 
         CitizenProfile profile = new CitizenProfile();
         profile.setId(UUID.randomUUID());
@@ -233,28 +243,55 @@ public class AuthServiceImpl implements AuthService {
         String identifier = request.resolvedIdentifier();
         String principal =
                 PhoneNumberUtils.looksLikeEmail(identifier) ? identifier.toLowerCase() : identifier;
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(principal, request.getPassword()));
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(principal, request.getPassword()));
+        } catch (AuthenticationException ex) {
+            auditComplianceService.logSystem(
+                    AuditOutcome.FAILED,
+                    "USER_LOGIN_FAILED",
+                    "USER",
+                    null,
+                    "Invalid credentials for " + maskLoginIdentifier(identifier),
+                    maskLoginIdentifier(identifier));
+            throw ex;
+        }
 
         User user = findUserByLoginIdentifier(identifier)
-                .orElseThrow(() -> new BusinessException("Invalid credentials"));
+                .orElseThrow(() -> {
+                    auditComplianceService.logSystem(
+                            AuditOutcome.FAILED,
+                            "USER_LOGIN_FAILED",
+                            "USER",
+                            null,
+                            "Invalid credentials for " + maskLoginIdentifier(identifier),
+                            maskLoginIdentifier(identifier));
+                    return new BusinessException("Invalid credentials");
+                });
 
         boolean isCitizen = user.getRoles().stream().anyMatch(role -> RoleCodes.CITIZEN.equals(role.getCode()));
 
         if (isCitizen) {
             if (user.getStatus() == UserStatus.PENDING_EMAIL_VERIFICATION || !user.isPhoneVerified()) {
+                auditLoginFailure(user, "Account not verified");
                 throw new BusinessException("Please verify your account with OTP before logging in");
             }
         } else {
             if (user.getStatus() == UserStatus.PENDING_ACTIVATION) {
+                auditLoginFailure(user, "Account pending activation");
                 throw new BusinessException("Please activate your account before logging in");
             }
         }
 
         if (user.getStatus() == UserStatus.DISABLED) {
-            throw new BusinessException("Account is disabled");
+            auditLoginFailure(user, "Account disabled");
+            var config = platformSettingsService.getEffectiveConfig();
+            throw new BusinessException(String.format(
+                    "Your account has been deactivated. Contact support at %s or %s for assistance.",
+                    config.getSupportEmail(), config.getSupportPhone()));
         }
         if (user.getStatus() == UserStatus.LOCKED) {
+            auditLoginFailure(user, "Account locked");
             throw new BusinessException("Account is locked");
         }
 
@@ -314,15 +351,33 @@ public class AuthServiceImpl implements AuthService {
     public AuthTokensResponse refresh(RefreshTokenRequest request) {
         RefreshToken stored = refreshTokenRepository
                 .findByTokenHashAndRevokedFalse(hashToken(request.getRefreshToken()))
-                .orElseThrow(() -> new BusinessException("Invalid refresh token"));
+                .orElseThrow(() -> {
+                    auditComplianceService.logSystem(
+                            AuditOutcome.FAILED,
+                            "TOKEN_REFRESH_FAILED",
+                            "USER",
+                            null,
+                            "Invalid refresh token",
+                            "unknown");
+                    return new BusinessException("Invalid refresh token");
+                });
         if (stored.getExpiresAt().isBefore(Instant.now())) {
+            auditComplianceService.logSystem(
+                    AuditOutcome.FAILED,
+                    "TOKEN_REFRESH_FAILED",
+                    "USER",
+                    stored.getUser().getId(),
+                    "Refresh token expired",
+                    stored.getUser().getEmail());
             throw new BusinessException("Refresh token expired");
         }
         User user = stored.getUser();
         if (user.getStatus() == UserStatus.DISABLED) {
+            auditLoginFailure(user, "Account disabled during token refresh");
             throw new BusinessException("Account is disabled");
         }
         if (user.getStatus() == UserStatus.LOCKED) {
+            auditLoginFailure(user, "Account locked during token refresh");
             throw new BusinessException("Account is locked");
         }
         stored.setRevoked(true);
@@ -392,6 +447,12 @@ public class AuthServiceImpl implements AuthService {
 
         if (user.getPasswordHash() == null
                 || !passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            auditComplianceService.log(
+                    AuditOutcome.FAILED,
+                    "PASSWORD_CHANGE_FAILED",
+                    "USER",
+                    user.getId(),
+                    "Incorrect current password");
             throw new BusinessException("Current password is incorrect");
         }
 
@@ -408,7 +469,31 @@ public class AuthServiceImpl implements AuthService {
                 Map.of("fullName", user.getFirstName() + " " + user.getLastName()));
         issueVerificationToken(user, VerificationTokenType.EMAIL_VERIFICATION);
 
+        auditComplianceService.log("PASSWORD_CHANGED", "USER", user.getId(), "Password changed successfully");
         return buildAuthResponse(user);
+    }
+
+    private void auditLoginFailure(User user, String reason) {
+        auditComplianceService.log(
+                AuditOutcome.FAILED, "USER_LOGIN_FAILED", "USER", user.getId(), reason + ": " + user.getEmail());
+    }
+
+    private String maskLoginIdentifier(String identifier) {
+        if (!StringUtils.hasText(identifier)) {
+            return "unknown";
+        }
+        if (PhoneNumberUtils.looksLikeEmail(identifier)) {
+            int at = identifier.indexOf('@');
+            if (at <= 1) {
+                return identifier;
+            }
+            return identifier.charAt(0) + "***" + identifier.substring(at);
+        }
+        String digits = identifier.replaceAll("\\D", "");
+        if (digits.length() <= 4) {
+            return "***";
+        }
+        return "***" + digits.substring(digits.length() - 4);
     }
 
     private Optional<User> findUserByLoginIdentifier(String identifier) {
@@ -480,6 +565,7 @@ public class AuthServiceImpl implements AuthService {
                         .emailVerified(user.isEmailVerified())
                         .requiresEmailVerification(requiresEmailVerification)
                         .accountActive(accountActive)
+                        .profilePictureUrl(userProfileMapper.resolveProfilePictureUrl(user))
                         .build())
                 .build();
     }

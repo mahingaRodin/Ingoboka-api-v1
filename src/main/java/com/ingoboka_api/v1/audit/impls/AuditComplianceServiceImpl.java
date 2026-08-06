@@ -5,6 +5,7 @@ import com.ingoboka_api.v1.audit.models.DataSubjectRequest;
 import com.ingoboka_api.v1.audit.repositories.AuditLogRepository;
 import com.ingoboka_api.v1.audit.repositories.DataSubjectRequestRepository;
 import com.ingoboka_api.v1.audit.services.AuditComplianceService;
+import com.ingoboka_api.v1.common.enums.AuditOutcome;
 import com.ingoboka_api.v1.common.enums.DataSubjectRequestStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.ResolveDataSubjectRequest;
@@ -47,24 +48,62 @@ public class AuditComplianceServiceImpl implements AuditComplianceService {
     @Override
     @Transactional
     public void log(String action, String entityType, UUID entityId, String summary) {
-        log(action, entityType, entityId, summary, "SUCCESS");
+        log(action, entityType, entityId, summary, AuditOutcome.SUCCESS.value());
     }
 
     @Override
     @Transactional
     public void log(String action, String entityType, UUID entityId, String summary, String outcome) {
-        IngobokaUserDetails actor = safeCurrentUser();
+        persist(action, entityType, entityId, summary, AuditOutcome.from(outcome), safeCurrentUser());
+    }
+
+    @Override
+    @Transactional
+    public void log(AuditOutcome outcome, String action, String entityType, UUID entityId, String summary) {
+        persist(action, entityType, entityId, summary, outcome, safeCurrentUser());
+    }
+
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void logSystem(
+            AuditOutcome outcome,
+            String action,
+            String entityType,
+            UUID entityId,
+            String summary,
+            String actorEmail) {
+        persist(action, entityType, entityId, summary, outcome, null, actorEmail);
+    }
+
+    private void persist(
+            String action,
+            String entityType,
+            UUID entityId,
+            String summary,
+            AuditOutcome outcome,
+            IngobokaUserDetails actor) {
+        persist(action, entityType, entityId, summary, outcome, actor, actor != null ? actor.getEmail() : "system");
+    }
+
+    private void persist(
+            String action,
+            String entityType,
+            UUID entityId,
+            String summary,
+            AuditOutcome outcome,
+            IngobokaUserDetails actor,
+            String actorEmail) {
         AuditLog entry = new AuditLog();
         entry.setId(UUID.randomUUID());
         entry.setOrganizationId(actor != null ? actor.getOrganizationId() : null);
         entry.setActorUserId(actor != null ? actor.getUserId() : null);
-        entry.setActorEmail(actor != null ? actor.getEmail() : "system");
+        entry.setActorEmail(StringUtils.hasText(actorEmail) ? actorEmail : "system");
         entry.setAction(action);
         entry.setEntityType(entityType);
         entry.setEntityId(entityId);
         entry.setCorrelationId(MDC.get("correlationId"));
         entry.setSummary(summary != null ? summary : action);
-        entry.setOutcome(StringUtils.hasText(outcome) ? outcome.toUpperCase(Locale.ROOT) : "SUCCESS");
+        entry.setOutcome(outcome.value());
         entry.setCreatedAt(Instant.now());
         auditLogRepository.save(entry);
     }
@@ -189,7 +228,10 @@ public class AuditComplianceServiceImpl implements AuditComplianceService {
             entry.setResolvedAt(Instant.now());
         }
         dataSubjectRequestRepository.save(entry);
-        log("DATA_SUBJECT_REQUEST_RESOLVED", "DATA_SUBJECT_REQUEST", entry.getId(), request.getStatus().name());
+        AuditOutcome outcome = request.getStatus() == DataSubjectRequestStatus.REJECTED
+                ? AuditOutcome.FAILED
+                : AuditOutcome.SUCCESS;
+        log(outcome, "DATA_SUBJECT_REQUEST_RESOLVED", "DATA_SUBJECT_REQUEST", entry.getId(), request.getStatus().name());
         return toDataSubjectResponse(entry);
     }
 
@@ -218,7 +260,8 @@ public class AuditComplianceServiceImpl implements AuditComplianceService {
                 predicates.add(cb.equal(cb.upper(root.get("entityType")), resourceType.toUpperCase(Locale.ROOT)));
             }
             if (StringUtils.hasText(outcome)) {
-                predicates.add(cb.equal(cb.upper(root.get("outcome")), outcome.toUpperCase(Locale.ROOT)));
+                String normalized = AuditOutcome.from(outcome).value();
+                predicates.add(cb.equal(cb.upper(root.get("outcome")), normalized));
             }
             Instant fromInstant = parseInstant(from);
             Instant toInstant = parseInstant(to);

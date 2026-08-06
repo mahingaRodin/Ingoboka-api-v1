@@ -62,6 +62,53 @@ public class NotificationTemplateServiceImpl implements NotificationTemplateServ
         }
     }
 
+    @Override
+    public void notifyAllChannels(
+            UUID userId,
+            UUID organizationId,
+            String templateCode,
+            String email,
+            String phone,
+            Map<String, String> variables) {
+        NotificationTemplate template = notificationTemplateRepository
+                .findByCodeAndActiveTrue(templateCode)
+                .orElse(null);
+        if (template == null) {
+            log.warn("Notification template not found: {}", templateCode);
+            return;
+        }
+
+        String subject = render(template.getSubjectTemplate(), variables);
+        String body = render(template.getBodyTemplate(), variables);
+
+        userNotificationService.dispatch(
+                userId, organizationId, NotificationChannel.IN_APP, templateCode, subject, body);
+
+        if (email != null && !email.isBlank()) {
+            userNotificationService.dispatch(
+                    userId, organizationId, NotificationChannel.EMAIL, templateCode, subject, body);
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setTo(email);
+                message.setSubject(subject);
+                message.setText(body);
+                mailSender.send(message);
+            } catch (Exception ex) {
+                log.warn("Email delivery failed for {}: {}", templateCode, ex.getMessage());
+            }
+        }
+
+        if (phone != null && !phone.isBlank()) {
+            userNotificationService.dispatch(
+                    userId, organizationId, NotificationChannel.SMS, templateCode, subject, body);
+            try {
+                smsDeliveryService.send(phone, body);
+            } catch (Exception ex) {
+                log.warn("SMS delivery failed for {}: {}", templateCode, ex.getMessage());
+            }
+        }
+    }
+
     private String render(String template, Map<String, String> variables) {
         String result = template;
         for (Map.Entry<String, String> entry : variables.entrySet()) {

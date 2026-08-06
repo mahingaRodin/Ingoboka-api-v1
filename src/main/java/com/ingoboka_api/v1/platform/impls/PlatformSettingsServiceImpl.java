@@ -6,6 +6,7 @@ import com.ingoboka_api.v1.common.responses.PlatformSettingsResponse;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.platform.models.PlatformSetting;
 import com.ingoboka_api.v1.platform.repositories.PlatformSettingRepository;
+import com.ingoboka_api.v1.platform.services.AnnouncementService;
 import com.ingoboka_api.v1.platform.services.PlatformSettingsService;
 import java.time.Instant;
 import java.util.HashMap;
@@ -24,6 +25,7 @@ public class PlatformSettingsServiceImpl implements PlatformSettingsService {
 
     private final PlatformSettingRepository platformSettingRepository;
     private final AuditComplianceService auditComplianceService;
+    private final AnnouncementService announcementService;
 
     @Value("${ingoboka.platform.name:Ingoboka}")
     private String defaultPlatformName;
@@ -103,6 +105,12 @@ public class PlatformSettingsServiceImpl implements PlatformSettingsService {
                 "PLATFORM_SETTINGS",
                 null,
                 "Updated keys: " + String.join(", ", updates.keySet()));
+
+        if (!updates.isEmpty()) {
+            announcementService.createPlatformAnnouncement(
+                    "Platform settings updated",
+                    "Important platform settings were changed. Review notifications for details that may affect your account.");
+        }
 
         return toResponse();
     }

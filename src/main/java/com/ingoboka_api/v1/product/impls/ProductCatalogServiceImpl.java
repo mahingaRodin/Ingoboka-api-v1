@@ -30,6 +30,7 @@ import com.ingoboka_api.v1.product.repositories.ProductExclusionRepository;
 import com.ingoboka_api.v1.product.repositories.ProductDocumentRepository;
 import com.ingoboka_api.v1.product.repositories.ProductFaqRepository;
 import com.ingoboka_api.v1.product.repositories.ProductPlanRepository;
+import com.ingoboka_api.v1.platform.services.AnnouncementService;
 import com.ingoboka_api.v1.product.services.ProductCatalogService;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -53,6 +54,7 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
     private final ProductDocumentRepository productDocumentRepository;
     private final StorageUrlResolver storageUrlResolver;
     private final OrganizationManagementService organizationManagementService;
+    private final AnnouncementService announcementService;
 
     @Override
     @Transactional
@@ -71,6 +73,9 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
         product.setDescription(request.getDescription());
         product.setCategory(request.getCategory());
         product.setStatus(ProductStatus.DRAFT);
+        if (request.getHeroImageUrl() != null && !request.getHeroImageUrl().isBlank()) {
+            product.setHeroImageKey(request.getHeroImageUrl().trim());
+        }
         product.setCreatedAt(now);
         product.setUpdatedAt(now);
         return toProductResponse(productRepository.save(product));
@@ -90,7 +95,12 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
         product.setStatus(ProductStatus.PUBLISHED);
         product.setPublishedAt(Instant.now());
         product.setUpdatedAt(Instant.now());
-        return toProductResponse(productRepository.save(product));
+        InsuranceProduct saved = productRepository.save(product);
+        announcementService.createInsurerAnnouncement(
+                product.getOrganizationId(),
+                "Insurance product update",
+                product.getName() + " is now available with updated pricing and coverage. Review the catalog for details.");
+        return toProductResponse(saved);
     }
 
     @Override

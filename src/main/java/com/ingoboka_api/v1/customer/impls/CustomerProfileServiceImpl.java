@@ -7,10 +7,13 @@ import com.ingoboka_api.v1.common.requests.CreateDependantRequest;
 import com.ingoboka_api.v1.common.requests.FrontendConsentRequest;
 import com.ingoboka_api.v1.common.requests.GrantConsentRequest;
 import com.ingoboka_api.v1.common.requests.ReviewKycRequest;
+import com.ingoboka_api.v1.common.requests.SaveNeedsAssessmentPreferencesRequest;
 import com.ingoboka_api.v1.common.requests.UpdateCitizenProfileRequest;
+import com.ingoboka_api.v1.common.requests.UpdateDependantRequest;
 import com.ingoboka_api.v1.common.responses.CitizenProfileResponse;
 import com.ingoboka_api.v1.common.responses.ConsentResponse;
 import com.ingoboka_api.v1.common.responses.DependantResponse;
+import com.ingoboka_api.v1.common.responses.NeedsAssessmentPreferencesResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
@@ -23,7 +26,13 @@ import com.ingoboka_api.v1.customer.repositories.CitizenProfileRepository;
 import com.ingoboka_api.v1.customer.repositories.ConsentRepository;
 import com.ingoboka_api.v1.customer.repositories.DependantRepository;
 import com.ingoboka_api.v1.customer.services.CustomerProfileService;
+import com.ingoboka_api.v1.identity.repositories.UserRepository;
+import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.Period;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -34,9 +43,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CustomerProfileServiceImpl implements CustomerProfileService {
 
+    private static final int MAX_DEPENDANT_AGE = 18;
+
     private final CitizenProfileRepository citizenProfileRepository;
     private final DependantRepository dependantRepository;
     private final ConsentRepository consentRepository;
+    private final UserRepository userRepository;
+    private final NotificationTemplateService notificationTemplateService;
 
     @Override
     @Transactional(readOnly = true)
@@ -97,6 +110,7 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
     @Override
     @Transactional
     public DependantResponse addDependant(CreateDependantRequest request) {
+        validateDependantAge(request.getDateOfBirth());
         CitizenProfile profile = requireMyProfile();
         Instant now = Instant.now();
         Dependant dependant = new Dependant();
@@ -111,6 +125,28 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
         }
         dependant.setCreatedAt(now);
         dependant.setUpdatedAt(now);
+        return toDependantResponse(dependantRepository.save(dependant));
+    }
+
+    @Override
+    @Transactional
+    public DependantResponse updateDependant(UUID dependantId, UpdateDependantRequest request) {
+        validateDependantAge(request.getDateOfBirth());
+        CitizenProfile profile = requireMyProfile();
+        Dependant dependant = dependantRepository
+                .findById(dependantId)
+                .orElseThrow(() -> new BusinessException("Dependant not found"));
+        if (!profile.getId().equals(dependant.getCitizenProfileId())) {
+            throw new BusinessException("Access denied");
+        }
+        dependant.setFirstName(request.getFirstName());
+        dependant.setLastName(request.getLastName());
+        dependant.setRelationship(request.getRelationship());
+        dependant.setDateOfBirth(request.getDateOfBirth());
+        if (request.getNationalId() != null && !request.getNationalId().isBlank()) {
+            dependant.setNationalIdHash(HashUtils.sha256(request.getNationalId()));
+        }
+        dependant.setUpdatedAt(Instant.now());
         return toDependantResponse(dependantRepository.save(dependant));
     }
 
@@ -264,9 +300,19 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
         CitizenProfile profile = citizenProfileRepository
                 .findById(request.getCitizenProfileId())
                 .orElseThrow(() -> new BusinessException("Citizen profile not found"));
+        KycStatus previous = profile.getKycStatus();
         profile.setKycStatus(request.getStatus());
         profile.setUpdatedAt(Instant.now());
         citizenProfileRepository.save(profile);
+        if (request.getStatus() == KycStatus.VERIFIED && previous != KycStatus.VERIFIED) {
+            userRepository.findById(profile.getUserId()).ifPresent(user -> notificationTemplateService.notifyAllChannels(
+                    user.getId(),
+                    null,
+                    "KYC_APPROVED",
+                    user.getEmail(),
+                    user.getPhoneNumber(),
+                    Map.of("fullName", user.getFirstName() + " " + user.getLastName())));
+        }
         return toResponse(profile);
     }
 
@@ -311,5 +357,64 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
             throw new BusinessException("At least one consent flag must be true");
         }
         return last;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public NeedsAssessmentPreferencesResponse getNeedsAssessmentPreferences() {
+        CitizenProfile profile = requireMyProfile();
+        return toNeedsAssessmentResponse(profile);
+    }
+
+    @Override
+    @Transactional
+    public NeedsAssessmentPreferencesResponse saveNeedsAssessmentPreferences(
+            SaveNeedsAssessmentPreferencesRequest request) {
+        CitizenProfile profile = requireMyProfile();
+        Map<String, Object> preferences = new HashMap<>();
+        if (request.getOccupation() != null) {
+            preferences.put("occupation", request.getOccupation());
+        }
+        if (request.getIncomeRange() != null) {
+            preferences.put("incomeRange", request.getIncomeRange());
+        }
+        if (request.getDependents() != null) {
+            preferences.put("dependents", request.getDependents());
+        }
+        if (request.getPrimaryRisk() != null) {
+            preferences.put("primaryRisk", request.getPrimaryRisk());
+        }
+        if (request.getPaymentPreference() != null) {
+            preferences.put("paymentPreference", request.getPaymentPreference());
+        }
+        if (request.getSmartphoneAccess() != null) {
+            preferences.put("smartphoneAccess", request.getSmartphoneAccess());
+        }
+        if (request.getAnswers() != null) {
+            preferences.put("answers", request.getAnswers());
+        }
+        profile.setNeedsAssessmentPreferences(preferences);
+        profile.setNeedsAssessmentCompletedAt(Instant.now());
+        profile.setUpdatedAt(Instant.now());
+        citizenProfileRepository.save(profile);
+        return toNeedsAssessmentResponse(profile);
+    }
+
+    private NeedsAssessmentPreferencesResponse toNeedsAssessmentResponse(CitizenProfile profile) {
+        return NeedsAssessmentPreferencesResponse.builder()
+                .completed(profile.getNeedsAssessmentCompletedAt() != null)
+                .completedAt(profile.getNeedsAssessmentCompletedAt())
+                .preferences(profile.getNeedsAssessmentPreferences())
+                .build();
+    }
+
+    private void validateDependantAge(LocalDate dateOfBirth) {
+        if (dateOfBirth == null) {
+            return;
+        }
+        int age = Period.between(dateOfBirth, LocalDate.now()).getYears();
+        if (age >= MAX_DEPENDANT_AGE) {
+            throw new BusinessException("Dependants must be under 18 years old");
+        }
     }
 }
