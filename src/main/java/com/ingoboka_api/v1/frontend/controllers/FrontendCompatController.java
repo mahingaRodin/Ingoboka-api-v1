@@ -266,8 +266,20 @@ public class FrontendCompatController {
     @PreAuthorize("hasRole('AGENT')")
     @SecurityRequirement(name = "bearerAuth")
     public ApiResponse<PageResponse<ApplicationResponse>> agentApplications(
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("Applications", enrollmentService.listAgentApplications(page, size));
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        ApplicationStatus appStatus = null;
+        if ("PENDING".equalsIgnoreCase(status)) {
+            appStatus = ApplicationStatus.SUBMITTED;
+        } else if (status != null && !status.isBlank()) {
+            try {
+                appStatus = ApplicationStatus.valueOf(status);
+            } catch (Exception e) {
+                // ignore invalid status filter
+            }
+        }
+        return ApiResponse.ok("Applications", enrollmentService.listAgentApplications(appStatus, page, size));
     }
 
     @PostMapping("/api/v1/agent/applications")

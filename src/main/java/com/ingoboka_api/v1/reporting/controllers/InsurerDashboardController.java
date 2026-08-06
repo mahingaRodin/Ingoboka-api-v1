@@ -43,7 +43,8 @@ public class InsurerDashboardController {
     }
 
     @GetMapping("/products")
-    @PreAuthorize("hasAnyRole('INSURER_PRODUCT_MANAGER', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
+    @PreAuthorize(
+            "hasAnyRole('INSURER_PRODUCT_MANAGER', 'PARTNER_ADMIN', 'CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PLATFORM_ADMIN')")
     @Operation(summary = "List tenant products (insurer alias)")
     public ApiResponse<PageResponse<ProductResponse>> tenantProducts(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
