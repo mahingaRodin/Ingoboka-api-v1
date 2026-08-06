@@ -1,13 +1,4 @@
 name: CI/CD
-
-# Deploys to Azure VM (docker compose) on push to main.
-# Required GitHub secrets:
-#   SERVER_HOST      = 4.168.192.169
-#   SERVER_USERNAME  = azureuser
-#   SERVER_SSH_KEY   = private SSH key (PEM) matching the VM
-# Optional:
-#   SERVER_SSH_PASSPHRASE = only if the private key is encrypted
-
 on:
   push:
     branches: [main]
