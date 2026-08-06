@@ -63,6 +63,8 @@ public class ClaimServiceImpl implements ClaimService {
 
     private static final Set<ClaimStatus> APPEALABLE = Set.of(ClaimStatus.REJECTED, ClaimStatus.APPROVED);
 
+    private static final Set<ClaimStatus> CANCELLABLE = Set.of(ClaimStatus.DRAFT, ClaimStatus.SUBMITTED);
+
     private static final Map<String, List<String>> PROVINCE_DISTRICTS = buildProvinceDistricts();
 
     private static Map<String, List<String>> buildProvinceDistricts() {
@@ -125,6 +127,21 @@ public class ClaimServiceImpl implements ClaimService {
                 "decision", "SUBMITTED",
                 "notes", "Your claim is now under review."));
         auditComplianceService.log("CLAIM_SUBMITTED", "CLAIM", claim.getId(), "Claim submitted");
+        return toResponse(claim);
+    }
+
+    @Override
+    @Transactional
+    public ClaimResponse cancelClaim(UUID claimId) {
+        Claim claim = requireOwnedClaim(claimId);
+        if (!CANCELLABLE.contains(claim.getStatus())) {
+            throw new BusinessException("Only pending claims can be cancelled");
+        }
+        UUID actorId = SecurityUtils.currentUser().getUserId();
+        transitionStatus(claim, ClaimStatus.CANCELLED, "Claim withdrawn by policyholder", actorId);
+        claim.setUpdatedAt(Instant.now());
+        claimRepository.save(claim);
+        auditComplianceService.log("CLAIM_CANCELLED", "CLAIM", claim.getId(), "Claim cancelled by policyholder");
         return toResponse(claim);
     }
 

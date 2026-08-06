@@ -14,7 +14,6 @@ import com.ingoboka_api.v1.common.requests.ReviewApplicationRequest;
 import com.ingoboka_api.v1.common.requests.SubmitApplicationRequest;
 import com.ingoboka_api.v1.common.enums.ProductStatus;
 import com.ingoboka_api.v1.common.responses.ApplicationResponse;
-import com.ingoboka_api.v1.common.responses.RecommendedProductResponse;
 import com.ingoboka_api.v1.common.responses.NeedsAssessmentResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.QuoteResponse;
@@ -34,6 +33,7 @@ import com.ingoboka_api.v1.enrollment.repositories.PolicyApplicationRepository;
 import com.ingoboka_api.v1.enrollment.repositories.QuoteAnswerRepository;
 import com.ingoboka_api.v1.enrollment.repositories.QuoteRepository;
 import com.ingoboka_api.v1.enrollment.services.EnrollmentService;
+import com.ingoboka_api.v1.enrollment.services.NeedsAssessmentRecommendationService;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.policy.services.PolicyIssuanceService;
 import com.ingoboka_api.v1.product.models.EligibilityRule;
@@ -77,6 +77,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final EligibilityRuleRepository eligibilityRuleRepository;
     private final PolicyIssuanceService policyIssuanceService;
     private final UserRepository userRepository;
+    private final NeedsAssessmentRecommendationService needsAssessmentRecommendationService;
     private final AuditComplianceService auditComplianceService;
     private final ConsentRepository consentRepository;
 
@@ -149,46 +150,16 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     @Override
     @Transactional(readOnly = true)
     public NeedsAssessmentResponse assessNeeds(NeedsAssessmentRequest request) {
-        int score = 50;
-        if (request.getDependents() != null && request.getDependents() > 2) {
-            score += 15;
-        }
-        if (request.getPrimaryRisk() != null) {
-            score += 10;
-        }
-        List<String> categories = new ArrayList<>();
-        categories.add("PERSONAL_ACCIDENT");
-        if (score >= 65) {
-            categories.add("HEALTH_MICRO");
-        }
-        final int assessmentScore = score;
-        List<RecommendedProductResponse> recommendedProducts = productRepository
-                .findByStatusOrderByPublishedAtDesc(ProductStatus.PUBLISHED)
-                .stream()
-                .filter(product -> categories.contains(product.getCategory()))
-                .limit(3)
-                .map(product -> {
-                    var plans = productPlanRepository.findByProductIdAndStatus(product.getId(), ProductStatus.PUBLISHED);
-                    var startingPremium = plans.stream()
-                            .map(ProductPlan::getPremiumAmount)
-                            .min(java.util.Comparator.naturalOrder())
-                            .orElse(null);
-                    return RecommendedProductResponse.builder()
-                            .id(product.getId())
-                            .name(product.getName())
-                            .category(product.getCategory())
-                            .startingPremium(startingPremium)
-                            .currency("RWF")
-                            .matchScore(Math.min(100, assessmentScore + 20))
-                            .reason("Matches " + product.getCategory().replace('_', ' ').toLowerCase())
-                            .build();
-                })
-                .toList();
+        var result = needsAssessmentRecommendationService.recommend(
+                request.getOccupation(),
+                request.getIncomeRange(),
+                request.getDependents(),
+                request.getPrimaryRisk());
         return NeedsAssessmentResponse.builder()
-                .score(score)
-                .guidance("Based on your profile, consider personal accident cover first.")
-                .recommendedCategories(categories)
-                .recommendedProducts(recommendedProducts)
+                .score(result.score())
+                .guidance(result.guidance())
+                .recommendedCategories(result.recommendedCategories())
+                .recommendedProducts(result.recommendedProducts())
                 .build();
     }
 

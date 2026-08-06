@@ -26,6 +26,7 @@ import com.ingoboka_api.v1.customer.repositories.CitizenProfileRepository;
 import com.ingoboka_api.v1.customer.repositories.ConsentRepository;
 import com.ingoboka_api.v1.customer.repositories.DependantRepository;
 import com.ingoboka_api.v1.customer.services.CustomerProfileService;
+import com.ingoboka_api.v1.enrollment.services.NeedsAssessmentRecommendationService;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
 import java.time.Instant;
@@ -50,6 +51,7 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
     private final ConsentRepository consentRepository;
     private final UserRepository userRepository;
     private final NotificationTemplateService notificationTemplateService;
+    private final NeedsAssessmentRecommendationService needsAssessmentRecommendationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -401,11 +403,20 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
     }
 
     private NeedsAssessmentPreferencesResponse toNeedsAssessmentResponse(CitizenProfile profile) {
-        return NeedsAssessmentPreferencesResponse.builder()
+        var builder = NeedsAssessmentPreferencesResponse.builder()
                 .completed(profile.getNeedsAssessmentCompletedAt() != null)
                 .completedAt(profile.getNeedsAssessmentCompletedAt())
-                .preferences(profile.getNeedsAssessmentPreferences())
-                .build();
+                .preferences(profile.getNeedsAssessmentPreferences());
+        if (profile.getNeedsAssessmentCompletedAt() != null
+                && profile.getNeedsAssessmentPreferences() != null
+                && !profile.getNeedsAssessmentPreferences().isEmpty()) {
+            var recommendation = needsAssessmentRecommendationService.recommendFromPreferences(
+                    profile.getNeedsAssessmentPreferences());
+            builder
+                    .recommendedCategories(recommendation.recommendedCategories())
+                    .recommendedProducts(recommendation.recommendedProducts());
+        }
+        return builder.build();
     }
 
     private void validateDependantAge(LocalDate dateOfBirth) {
