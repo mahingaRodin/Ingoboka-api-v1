@@ -307,7 +307,7 @@ public class ClaimServiceImpl implements ClaimService {
                     request.getApprovedAmount() != null
                             ? request.getApprovedAmount().toPlainString()
                             : claim.getClaimedAmount().toPlainString(),
-                    "currency", claim.getCurrency()));
+                    "currency", "RWF"));
         }
         AuditOutcome outcome = request.getDecision() == ClaimDecisionType.REJECTED
                 ? AuditOutcome.FAILED
