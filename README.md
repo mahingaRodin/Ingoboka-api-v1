@@ -1,6 +1,6 @@
 # Ingoboka API v1
 
-Enterprise **B2B2C digital insurance platform** API for Rwanda — citizens enroll in micro-insurance products, insurers manage catalogs and claims, agents assist enrollments, and platform admins onboard partners.
+Enterprise **B2B2C Digital insurance platform** API for Rwanda — citizens enroll in micro-insurance products, insurers manage catalogs and claims, agents assist enrollments, and platform admins onboard partners.
 
 Built with **Java 21**, **Spring Boot 4**, **PostgreSQL**, **Redis**, and **MinIO**. Designed to power the Ingoboka Next.js frontend and hackathon/demo deployments.
 
