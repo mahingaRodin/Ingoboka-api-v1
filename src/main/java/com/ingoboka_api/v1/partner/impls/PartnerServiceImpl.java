@@ -11,6 +11,7 @@ import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.PartnerResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
+import com.ingoboka_api.v1.common.util.CountryCodes;
 import com.ingoboka_api.v1.identity.models.Organization;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.identity.services.OrganizationManagementService;
@@ -146,7 +147,7 @@ public class PartnerServiceImpl implements PartnerService {
         profile.setContactPhone(request.getContactPhone());
         profile.setAddressLine(request.getAddressLine());
         profile.setDistrict(request.getDistrict());
-        profile.setCountry(request.getCountry() != null ? request.getCountry() : "RW");
+        profile.setCountry(CountryCodes.normalizeRwandaAware(request.getCountry()));
         profile.setWebsite(request.getWebsite());
         profile.setCreatedAt(now);
         profile.setUpdatedAt(now);
@@ -181,7 +182,7 @@ public class PartnerServiceImpl implements PartnerService {
             profile.setDistrict(request.getDistrict());
         }
         if (request.getCountry() != null) {
-            profile.setCountry(request.getCountry());
+            profile.setCountry(CountryCodes.normalizeRwandaAware(request.getCountry()));
         }
         if (request.getWebsite() != null) {
             profile.setWebsite(request.getWebsite());

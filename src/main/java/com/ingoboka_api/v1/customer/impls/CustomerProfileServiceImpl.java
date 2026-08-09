@@ -17,6 +17,7 @@ import com.ingoboka_api.v1.common.responses.NeedsAssessmentPreferencesResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
+import com.ingoboka_api.v1.common.util.CountryCodes;
 import com.ingoboka_api.v1.common.util.HashUtils;
 import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.customer.models.CitizenProfile;
@@ -88,7 +89,7 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
             profile.setDistrict(request.getDistrict());
         }
         if (request.getCountry() != null) {
-            profile.setCountry(request.getCountry());
+            profile.setCountry(CountryCodes.normalizeRwandaAware(request.getCountry()));
         }
         if (request.getOccupation() != null) {
             profile.setOccupation(request.getOccupation());
