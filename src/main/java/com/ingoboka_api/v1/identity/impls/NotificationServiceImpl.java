@@ -6,12 +6,15 @@ import com.ingoboka_api.v1.common.enums.VerificationTokenType;
 import com.ingoboka_api.v1.identity.models.User;
 import com.ingoboka_api.v1.identity.services.NotificationService;
 import com.ingoboka_api.v1.messaging.services.EmailTemplateService;
+import jakarta.mail.internet.MimeMessage;
+import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -58,8 +61,12 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public void sendTemplatedEmail(String email, String templateName, Map<String, String> variables) {
-        EmailTemplateService.RenderedEmail rendered = emailTemplateService.render(templateName, variables);
-        sendPlainEmail(email, rendered.subject(), rendered.body(), templateName, null);
+        Map<String, String> enriched = new HashMap<>(variables != null ? variables : Map.of());
+        enriched.putIfAbsent("logoUrl", platformProperties.getBrandLogoUrl());
+        enriched.putIfAbsent("year", String.valueOf(java.time.Year.now().getValue()));
+
+        EmailTemplateService.RenderedEmail rendered = emailTemplateService.render(templateName, enriched);
+        sendMultipartEmail(email, rendered.subject(), rendered.htmlBody(), rendered.textBody(), templateName, null);
     }
 
     @Override
@@ -94,6 +101,28 @@ public class NotificationServiceImpl implements NotificationService {
     public void sendOtpEmail(String email, String otp, int expirationMinutes) {
         sendTemplatedEmail(
                 email, "otp-verification", Map.of("otp", otp, "minutes", String.valueOf(expirationMinutes)));
+    }
+
+    private void sendMultipartEmail(
+            String email, String subject, String htmlBody, String textBody, String context, String devToken) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            if (mailFrom != null && !mailFrom.isBlank()) {
+                helper.setFrom(mailFrom.trim());
+            }
+            helper.setTo(email);
+            helper.setSubject(subject);
+            helper.setText(textBody, htmlBody);
+            mailSender.send(message);
+        } catch (Exception ex) {
+            log.warn("Failed to send {} email to {}: {}", context, email, ex.getMessage());
+            if (devToken != null) {
+                log.info("DEV TOKEN [{}] for {}: {}", context, email, devToken);
+            } else {
+                log.info("DEV EMAIL [{}] to {}: {}", context, email, textBody);
+            }
+        }
     }
 
     private void sendPlainEmail(String email, String subject, String body, String context, String devToken) {
