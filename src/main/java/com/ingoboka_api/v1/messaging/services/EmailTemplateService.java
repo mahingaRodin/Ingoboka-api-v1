@@ -6,5 +6,5 @@ public interface EmailTemplateService {
 
     RenderedEmail render(String templateName, Map<String, String> variables);
 
-    record RenderedEmail(String subject, String body) {}
+    record RenderedEmail(String subject, String htmlBody, String textBody) {}
 }

@@ -200,7 +200,10 @@ Also update **CORS** in VM `.env`:
 
 ```env
 CORS_ALLOWED_ORIGINS=https://ingoboka-platform.vercel.app,http://localhost:3000
-FRONTEND_VERIFY_EMAIL_URL=https://ingoboka-platform.vercel.app/verify-email
+FRONTEND_LOGIN_URL=https://ingoboka-platform.vercel.app/en/login
+FRONTEND_VERIFY_EMAIL_URL=https://ingoboka-platform.vercel.app/en/verify-email
+FRONTEND_ACTIVATE_ACCOUNT_URL=https://ingoboka-platform.vercel.app/en/activate
+BRAND_LOGO_URL=https://ingoboka-platform.vercel.app/images/brand/ingoboka-logo.svg
 ```
 
 Then:

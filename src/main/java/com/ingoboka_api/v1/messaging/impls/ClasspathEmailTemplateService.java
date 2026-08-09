@@ -18,25 +18,41 @@ public class ClasspathEmailTemplateService implements EmailTemplateService {
 
     @Override
     public RenderedEmail render(String templateName, Map<String, String> variables) {
-        String raw = loadTemplate(templateName);
-        String rendered = applyVariables(raw, variables);
-        String subject = "Ingoboka notification";
-        String body = rendered;
+        String textRaw = loadTemplate(templateName, ".txt");
+        ParsedTemplate textTemplate = parseTemplate(textRaw);
 
-        int subjectIndex = rendered.indexOf("Subject:");
-        if (subjectIndex == 0) {
-            int lineBreak = rendered.indexOf('\n');
+        String htmlBody = textTemplate.body();
+        try {
+            String htmlRaw = loadTemplate(templateName, ".html");
+            htmlBody = parseTemplate(htmlRaw).body();
+        } catch (BusinessException ex) {
+            log.debug("No HTML template for {}, using plain text only", templateName);
+        }
+
+        String subject = applyVariables(textTemplate.subject(), variables);
+        htmlBody = applyVariables(htmlBody, variables);
+        String textBody = applyVariables(textTemplate.body(), variables);
+
+        return new RenderedEmail(subject, htmlBody, textBody);
+    }
+
+    private ParsedTemplate parseTemplate(String raw) {
+        String subject = "Ingoboka notification";
+        String body = raw;
+
+        if (raw.startsWith("Subject:")) {
+            int lineBreak = raw.indexOf('\n');
             if (lineBreak > 0) {
-                subject = rendered.substring("Subject:".length(), lineBreak).trim();
-                body = rendered.substring(lineBreak + 1).trim();
+                subject = raw.substring("Subject:".length(), lineBreak).trim();
+                body = raw.substring(lineBreak + 1).trim();
             }
         }
 
-        return new RenderedEmail(subject, body);
+        return new ParsedTemplate(subject, body);
     }
 
-    private String loadTemplate(String templateName) {
-        String path = TEMPLATE_PREFIX + templateName + ".txt";
+    private String loadTemplate(String templateName, String extension) {
+        String path = TEMPLATE_PREFIX + templateName + extension;
         try {
             ClassPathResource resource = new ClassPathResource(path);
             if (!resource.exists()) {
@@ -60,4 +76,6 @@ public class ClasspathEmailTemplateService implements EmailTemplateService {
         }
         return result;
     }
+
+    private record ParsedTemplate(String subject, String body) {}
 }

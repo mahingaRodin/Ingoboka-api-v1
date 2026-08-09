@@ -12,7 +12,9 @@ import org.springframework.stereotype.Component;
 public class PlatformProperties {
 
     private String name = "Ingoboka Platform";
-    private String frontendLoginUrl = "http://localhost:3000/login";
-    private String frontendVerifyEmailUrl = "http://localhost:3000/verify-email";
-    private String frontendActivateAccountUrl = "http://localhost:3000/activate";
+    private String frontendLoginUrl = "http://localhost:3000/en/login";
+    private String frontendVerifyEmailUrl = "http://localhost:3000/en/verify-email";
+    private String frontendActivateAccountUrl = "http://localhost:3000/en/activate";
+    private String brandLogoUrl =
+            "https://ingoboka-platform.vercel.app/images/brand/ingoboka-logo.svg";
 }
