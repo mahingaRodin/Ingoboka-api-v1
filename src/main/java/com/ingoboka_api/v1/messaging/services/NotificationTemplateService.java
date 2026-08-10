@@ -21,4 +21,15 @@ public interface NotificationTemplateService {
             String email,
             String phone,
             Map<String, String> variables);
+
+    void notifyAllChannels(
+            UUID userId,
+            UUID organizationId,
+            String templateCode,
+            String email,
+            String phone,
+            Map<String, String> variables,
+            int priority,
+            String referenceType,
+            UUID referenceId);
 }

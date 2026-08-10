@@ -25,6 +25,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import com.ingoboka_api.v1.document.services.DocumentStorageService;
+import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.util.HashUtils;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
@@ -228,6 +229,9 @@ public class FrontendCompatController {
             @PathVariable UUID claimId, @RequestBody Map<String, Object> payload) {
         String decisionStr = (String) payload.get("decision");
         String reason = (String) payload.get("reason");
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException("A reason is required for this claim decision");
+        }
         if ("REQUEST_INFO".equalsIgnoreCase(decisionStr)) {
              UpdateClaimStatusRequest updateReq = new UpdateClaimStatusRequest();
              updateReq.setStatus(ClaimStatus.INFORMATION_REQUIRED);

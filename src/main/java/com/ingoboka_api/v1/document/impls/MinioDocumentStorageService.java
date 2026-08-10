@@ -25,6 +25,8 @@ public class MinioDocumentStorageService implements DocumentStorageService {
 
     private final MinioProperties minioProperties;
     private MinioClient minioClient;
+    /** Separate client for presigned URLs so the host is browser-reachable. */
+    private MinioClient presignClient;
 
     @PostConstruct
     void init() {
@@ -32,20 +34,35 @@ public class MinioDocumentStorageService implements DocumentStorageService {
             log.warn("MinIO storage disabled");
             return;
         }
-        minioClient = MinioClient.builder()
-                .endpoint(minioProperties.getEndpoint())
-                .credentials(minioProperties.getAccessKey(), minioProperties.getSecretKey())
-                .build();
+        minioClient = buildClient(minioProperties.getEndpoint());
+        String publicEndpoint = minioProperties.getEffectivePublicEndpoint();
+        presignClient = publicEndpoint.equals(minioProperties.getEndpoint())
+                ? minioClient
+                : buildClient(publicEndpoint);
+        if (!publicEndpoint.equals(minioProperties.getEndpoint())) {
+            log.info(
+                    "MinIO presigned URLs will use public endpoint {} (internal: {})",
+                    publicEndpoint,
+                    minioProperties.getEndpoint());
+        }
         try {
             boolean exists = minioClient.bucketExists(
                     BucketExistsArgs.builder().bucket(minioProperties.getBucket()).build());
             if (!exists) {
                 minioClient.makeBucket(
                         MakeBucketArgs.builder().bucket(minioProperties.getBucket()).build());
+                log.info("Created MinIO bucket {}", minioProperties.getBucket());
             }
         } catch (Exception ex) {
             log.error("MinIO initialization failed: {}", ex.getMessage());
         }
+    }
+
+    private MinioClient buildClient(String endpoint) {
+        return MinioClient.builder()
+                .endpoint(endpoint)
+                .credentials(minioProperties.getAccessKey(), minioProperties.getSecretKey())
+                .build();
     }
 
     @Override
@@ -68,7 +85,7 @@ public class MinioDocumentStorageService implements DocumentStorageService {
     public String presignedDownloadUrl(String objectKey) {
         ensureClient();
         try {
-            return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+            return presignClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(Method.GET)
                     .bucket(minioProperties.getBucket())
                     .object(objectKey)
@@ -83,7 +100,7 @@ public class MinioDocumentStorageService implements DocumentStorageService {
     public String presignedUploadUrl(String objectKey, String contentType) {
         ensureClient();
         try {
-            return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+            return presignClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(Method.PUT)
                     .bucket(minioProperties.getBucket())
                     .object(objectKey)

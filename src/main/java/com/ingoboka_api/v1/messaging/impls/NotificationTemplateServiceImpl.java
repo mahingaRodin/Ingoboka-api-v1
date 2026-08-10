@@ -70,6 +70,20 @@ public class NotificationTemplateServiceImpl implements NotificationTemplateServ
             String email,
             String phone,
             Map<String, String> variables) {
+        notifyAllChannels(userId, organizationId, templateCode, email, phone, variables, 0, null, null);
+    }
+
+    @Override
+    public void notifyAllChannels(
+            UUID userId,
+            UUID organizationId,
+            String templateCode,
+            String email,
+            String phone,
+            Map<String, String> variables,
+            int priority,
+            String referenceType,
+            UUID referenceId) {
         NotificationTemplate template = notificationTemplateRepository
                 .findByCodeAndActiveTrue(templateCode)
                 .orElse(null);
@@ -82,7 +96,15 @@ public class NotificationTemplateServiceImpl implements NotificationTemplateServ
         String body = render(template.getBodyTemplate(), variables);
 
         userNotificationService.dispatch(
-                userId, organizationId, NotificationChannel.IN_APP, templateCode, subject, body);
+                userId,
+                organizationId,
+                NotificationChannel.IN_APP,
+                templateCode,
+                subject,
+                body,
+                priority,
+                referenceType,
+                referenceId);
 
         if (email != null && !email.isBlank()) {
             userNotificationService.dispatch(

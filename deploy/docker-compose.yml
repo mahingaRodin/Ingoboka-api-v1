@@ -47,6 +47,12 @@ services:
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
     networks:
       - ingoboka-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   api:
     build:
@@ -61,7 +67,7 @@ services:
       redis:
         condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ingoboka}
@@ -86,8 +92,10 @@ services:
       FRONTEND_LOGIN_URL: ${FRONTEND_LOGIN_URL:-https://ingoboka-platform.vercel.app/en/login}
       FRONTEND_VERIFY_EMAIL_URL: ${FRONTEND_VERIFY_EMAIL_URL:-https://ingoboka-platform.vercel.app/en/verify-email}
       FRONTEND_ACTIVATE_ACCOUNT_URL: ${FRONTEND_ACTIVATE_ACCOUNT_URL:-https://ingoboka-platform.vercel.app/en/activate}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://ingoboka-platform.vercel.app/en}
       BRAND_LOGO_URL: ${BRAND_LOGO_URL:-https://ingoboka-platform.vercel.app/images/brand/ingoboka-logo.svg}
       MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-ingoboka-documents}

@@ -119,6 +119,9 @@ public class ClaimServiceImpl implements ClaimService {
         if (claim.getStatus() != ClaimStatus.DRAFT) {
             throw new BusinessException("Only draft claims can be submitted");
         }
+        if (claimDocumentRepository.countByClaimId(claimId) < 1) {
+            throw new BusinessException("At least one supporting document is required before submitting a claim");
+        }
         transitionStatus(claim, ClaimStatus.SUBMITTED, "Claim submitted by policyholder", null);
         claim.setUpdatedAt(Instant.now());
         claimRepository.save(claim);
@@ -250,6 +253,9 @@ public class ClaimServiceImpl implements ClaimService {
         if (request.getIncidentDate() != null) claim.setIncidentDate(request.getIncidentDate());
         claim.setUpdatedAt(Instant.now());
         claimRepository.save(claim);
+        notifyClaimholder(claim, "CLAIM_UPDATED", Map.of(
+                "claimNumber", claim.getClaimNumber(),
+                "notes", "Review your claim for the latest details."));
         return toResponse(claim);
     }
 
@@ -265,11 +271,16 @@ public class ClaimServiceImpl implements ClaimService {
         if (request.getStatus() == ClaimStatus.DRAFT) {
             throw new BusinessException("Cannot move claim back to draft");
         }
+        requireDecisionReason(request.getStatus(), request.getReason());
 
         UUID actorId = SecurityUtils.currentUser().getUserId();
         transitionStatus(claim, request.getStatus(), request.getReason(), actorId);
         claim.setUpdatedAt(Instant.now());
         claimRepository.save(claim);
+        notifyClaimholder(claim, "CLAIM_STATUS_CHANGE", Map.of(
+                "claimNumber", claim.getClaimNumber(),
+                "status", request.getStatus().name(),
+                "notes", request.getReason() != null ? request.getReason() : ""));
         return toResponse(claim);
     }
 
@@ -285,6 +296,12 @@ public class ClaimServiceImpl implements ClaimService {
         if (claimDecisionRepository.findByClaimId(claimId).isPresent()) {
             throw new BusinessException("Decision already recorded for this claim");
         }
+        requireDecisionReason(
+                switch (request.getDecision()) {
+                    case APPROVED, PARTIAL -> ClaimStatus.APPROVED;
+                    case REJECTED -> ClaimStatus.REJECTED;
+                },
+                request.getReason());
 
         ClaimStatus targetStatus = switch (request.getDecision()) {
             case APPROVED -> ClaimStatus.APPROVED;
@@ -476,6 +493,21 @@ public class ClaimServiceImpl implements ClaimService {
         return "CLM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
+    private void requireDecisionReason(ClaimStatus status, String reason) {
+        if (!requiresDecisionReason(status)) {
+            return;
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException("A reason is required for this claim decision");
+        }
+    }
+
+    private boolean requiresDecisionReason(ClaimStatus status) {
+        return status == ClaimStatus.APPROVED
+                || status == ClaimStatus.REJECTED
+                || status == ClaimStatus.INFORMATION_REQUIRED;
+    }
+
     private String formatDecision(ClaimDecisionType decision, java.math.BigDecimal approvedAmount) {
         return switch (decision) {
             case APPROVED -> "APPROVED"
@@ -495,7 +527,10 @@ public class ClaimServiceImpl implements ClaimService {
                         templateCode,
                         user.getEmail(),
                         user.getPhoneNumber(),
-                        variables)));
+                        variables,
+                        1,
+                        "CLAIM",
+                        claim.getId())));
     }
 
     private ClaimResponse toResponse(Claim claim) {

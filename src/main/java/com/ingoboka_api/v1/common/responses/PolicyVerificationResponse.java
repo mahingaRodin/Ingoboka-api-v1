@@ -9,6 +9,8 @@ import lombok.Value;
 @Builder
 public class PolicyVerificationResponse {
     String policyNumber;
+    String productName;
+    String insurerName;
     PolicyStatus status;
     LocalDate startDate;
     LocalDate endDate;
