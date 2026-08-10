@@ -203,6 +203,7 @@ CORS_ALLOWED_ORIGINS=https://ingoboka-platform.vercel.app,http://localhost:3000
 FRONTEND_LOGIN_URL=https://ingoboka-platform.vercel.app/en/login
 FRONTEND_VERIFY_EMAIL_URL=https://ingoboka-platform.vercel.app/en/verify-email
 FRONTEND_ACTIVATE_ACCOUNT_URL=https://ingoboka-platform.vercel.app/en/activate
+FRONTEND_BASE_URL=https://ingoboka-platform.vercel.app/en
 BRAND_LOGO_URL=https://ingoboka-platform.vercel.app/images/brand/ingoboka-logo.svg
 ```
 
@@ -248,6 +249,20 @@ SEED_DEMO_DATA=true
 USSD_ENABLED=true
 ```
 
+**MinIO (profile photos + claim documents):**
+
+```env
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=<strong-minio-password>
+MINIO_BUCKET=ingoboka-documents
+# Browser-reachable URL — use your VM public IP (port 9000 must be open in NSG)
+MINIO_PUBLIC_ENDPOINT=http://YOUR_IP:9000
+```
+
+Open NSG port **9000** (MinIO API) to **Any** if the Vercel frontend must load uploaded images/documents via presigned URLs. Restrict **9001** (console) to your IP only.
+
+The API container always uses `MINIO_ENDPOINT=http://minio:9000` internally; only presigned URLs use `MINIO_PUBLIC_ENDPOINT`.
+
 Copy the rest from `deploy/.env.example` (SMS / AT flags as needed).
 
 ---
@@ -278,6 +293,7 @@ Copy the rest from `deploy/.env.example` (SMS / AT flags as needed).
 |---------|--------|
 | Swagger timeout | NSG rule for **8085**, `docker compose ps`, `curl localhost:8085/actuator/health` on VM |
 | Frontend CORS errors | `CORS_ALLOWED_ORIGINS` includes the Vercel origin exactly |
+| Profile images / documents 404 or blank | Set `MINIO_PUBLIC_ENDPOINT=http://YOUR_IP:9000`; open NSG port 9000; check `docker compose logs api` for "MinIO presigned URLs will use public endpoint" |
 | USSD “technical problems” | AT callback URL = new IP; API logs `USSD response ... CON` |
 | CI deploy fails SSH | `SERVER_HOST` / key / username; VM running |
 | OOM / API crash | Resize VM to **B2ms** |

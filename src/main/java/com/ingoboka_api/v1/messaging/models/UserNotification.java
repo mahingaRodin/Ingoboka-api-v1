@@ -51,6 +51,15 @@ public class UserNotification {
     @Column(name = "read_at")
     private Instant readAt;
 
+    @Column(nullable = false)
+    private int priority = 0;
+
+    @Column(name = "reference_type", length = 32)
+    private String referenceType;
+
+    @Column(name = "reference_id")
+    private UUID referenceId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 }

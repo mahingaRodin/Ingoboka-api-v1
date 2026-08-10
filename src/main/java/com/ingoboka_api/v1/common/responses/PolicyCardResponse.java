@@ -15,8 +15,11 @@ public class PolicyCardResponse {
     String policyNumber;
     String holderName;
     String productName;
+    String insurerName;
     PolicyStatus status;
     BigDecimal premium;
+    BigDecimal coverageAmount;
+    String currency;
     LocalDate startDate;
     LocalDate endDate;
     String qrToken;

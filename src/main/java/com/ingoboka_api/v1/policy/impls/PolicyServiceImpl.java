@@ -1,5 +1,6 @@
 package com.ingoboka_api.v1.policy.impls;
 
+import com.ingoboka_api.v1.common.config.PlatformProperties;
 import com.ingoboka_api.v1.common.enums.DocumentAccessClassification;
 import com.ingoboka_api.v1.common.enums.PolicyMemberType;
 import com.ingoboka_api.v1.common.enums.PolicyStatus;
@@ -73,6 +74,7 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
     private final InsuranceProductRepository insuranceProductRepository;
     private final ProductBenefitRepository productBenefitRepository;
     private final ClaimRepository claimRepository;
+    private final PlatformProperties platformProperties;
 
     @Override
     @Transactional
@@ -166,11 +168,18 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
                 .map(Organization::getCode)
                 .orElse("UNKNOWN");
 
+        String insurerName = organizationManagementService
+                .findById(policy.getOrganizationId())
+                .map(Organization::getName)
+                .orElse("Partner Insurer");
+
         boolean valid = policy.getStatus() == PolicyStatus.ACTIVE
                 || policy.getStatus() == PolicyStatus.GRACE_PERIOD;
 
         return PolicyVerificationResponse.builder()
                 .policyNumber(policy.getPolicyNumber())
+                .productName(resolveProductName(policy.getProductPlanId()))
+                .insurerName(insurerName)
                 .status(policy.getStatus())
                 .startDate(policy.getStartDate())
                 .endDate(policy.getEndDate())
@@ -409,12 +418,15 @@ public class PolicyServiceImpl implements PolicyService, PolicyIssuanceService {
                 .policyNumber(policy.getPolicyNumber())
                 .holderName(holder.getFirstName() + " " + holder.getLastName())
                 .productName(resolveProductName(policy.getProductPlanId()))
+                .insurerName(resolveInsurerName(policy.getOrganizationId()))
                 .status(policy.getStatus())
                 .premium(policy.getPremiumAmount())
+                .coverageAmount(resolveCoverageAmount(policy.getProductPlanId()))
+                .currency("RWF")
                 .startDate(policy.getStartDate())
                 .endDate(policy.getEndDate())
                 .qrToken(policy.getQrVerificationToken())
-                .verificationUrl("/api/v1/verify/" + policy.getQrVerificationToken())
+                .verificationUrl(platformProperties.buildPolicyVerificationUrl(policy.getQrVerificationToken()))
                 .build();
     }
 

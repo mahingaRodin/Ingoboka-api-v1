@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ClaimDocumentRepository extends JpaRepository<ClaimDocument, UUID> {
 
     List<ClaimDocument> findByClaimIdOrderByCreatedAtAsc(UUID claimId);
+
+    long countByClaimId(UUID claimId);
 }

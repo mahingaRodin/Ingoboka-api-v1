@@ -11,9 +11,22 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "ingoboka.storage.minio")
 public class MinioProperties {
     private boolean enabled = true;
+    /** Internal endpoint used by the API container for upload/delete (e.g. http://minio:9000). */
     private String endpoint = "http://localhost:9000";
+    /**
+     * Browser-reachable endpoint for presigned URLs (e.g. http://YOUR_IP:9000).
+     * Falls back to {@link #endpoint} when unset.
+     */
+    private String publicEndpoint;
     private String accessKey = "minioadmin";
     private String secretKey = "minioadmin";
     private String bucket = "ingoboka-documents";
     private int presignedExpiryMinutes = 60;
+
+    public String getEffectivePublicEndpoint() {
+        if (publicEndpoint != null && !publicEndpoint.isBlank()) {
+            return publicEndpoint.trim();
+        }
+        return endpoint;
+    }
 }

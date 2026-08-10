@@ -18,5 +18,8 @@ public class UserNotificationResponse {
     NotificationDeliveryStatus status;
     Instant sentAt;
     Instant readAt;
+    int priority;
+    String referenceType;
+    UUID referenceId;
     Instant createdAt;
 }
