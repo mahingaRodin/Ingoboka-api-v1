@@ -12,6 +12,7 @@ import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
 import io.minio.StatObjectArgs;
+import com.ingoboka_api.v1.document.util.DocumentUrlBuilder;
 import io.minio.http.Method;
 import io.minio.StatObjectResponse;
 import jakarta.annotation.PostConstruct;
@@ -142,13 +143,24 @@ public class MinioDocumentStorageService implements DocumentStorageService {
     @Override
     public String presignedUploadUrl(String objectKey, String contentType) {
         ensureClient();
+        if (DocumentUrlBuilder.isClaimEvidenceObjectKey(objectKey)) {
+            throw new BusinessException(
+                    "Presigned upload URLs are not allowed for claim evidence; use POST /api/v1/claims/{claimId}/documents");
+        }
         try {
-            return presignClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+            String url = presignClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(Method.PUT)
                     .bucket(minioProperties.getBucket())
                     .object(objectKey)
                     .expiry(minioProperties.getPresignedExpiryMinutes(), TimeUnit.MINUTES)
                     .build());
+            if (containsInternalHost(url)) {
+                throw new BusinessException(
+                        "Presigned upload URL is not browser-reachable; configure MINIO_PUBLIC_ENDPOINT or use the API upload proxy");
+            }
+            return url;
+        } catch (BusinessException ex) {
+            throw ex;
         } catch (Exception ex) {
             log.error("Failed to generate upload URL for {}: {}", objectKey, ex.getMessage(), ex);
             throw new BusinessException("Failed to generate upload URL");

@@ -26,6 +26,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.ingoboka_api.v1.document.model.DocumentContent;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -110,24 +111,31 @@ public class ClaimController {
         return ApiResponse.ok("Claim cancelled", claimService.cancelClaim(claimId));
     }
 
+    @DeleteMapping("/{claimId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "Delete a draft claim")
+    public ApiResponse<Void> deleteDraftClaim(@PathVariable UUID claimId) {
+        claimService.deleteDraftClaim(claimId);
+        return ApiResponse.ok("Draft claim deleted", null);
+    }
+
     @PostMapping(value = "/{claimId}/documents", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('CITIZEN', 'CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR')")
-    @Operation(summary = "Attach claim document metadata (after direct MinIO upload)")
-    public ApiResponse<Void> attachDocument(
+    @Operation(summary = "Attach claim document metadata (legacy — prefer multipart upload)")
+    public ApiResponse<ClaimDocumentResponse> attachDocument(
             @PathVariable UUID claimId, @Valid @RequestBody AttachClaimDocumentRequest request) {
-        claimService.attachDocument(claimId, request);
-        return ApiResponse.ok("Document attached", null);
+        return ApiResponse.ok("Document attached", claimService.attachDocument(claimId, request));
     }
 
     @PostMapping(value = "/{claimId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('CITIZEN', 'CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR')")
     @Operation(summary = "Upload claim document files (API proxy to MinIO)")
-    public ApiResponse<Void> uploadDocuments(
+    public ApiResponse<List<ClaimDocumentResponse>> uploadDocuments(
             @PathVariable UUID claimId, @RequestPart("files") MultipartFile[] files) {
-        claimService.uploadDocuments(claimId, files);
-        return ApiResponse.ok("Documents uploaded", null);
+        return ApiResponse.ok("Documents uploaded", claimService.uploadDocuments(claimId, files));
     }
 
     @GetMapping("/{claimId}/documents")

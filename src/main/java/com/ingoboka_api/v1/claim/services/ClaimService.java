@@ -25,6 +25,8 @@ public interface ClaimService {
 
     ClaimResponse cancelClaim(UUID claimId);
 
+    void deleteDraftClaim(UUID claimId);
+
     ClaimResponse getClaim(UUID claimId);
 
     PageResponse<ClaimResponse> listMyClaims(int page, int size);
@@ -49,9 +51,9 @@ public interface ClaimService {
 
     ClaimResponse recordDecision(UUID claimId, RecordClaimDecisionRequest request);
 
-    void attachDocument(UUID claimId, AttachClaimDocumentRequest request);
+    ClaimDocumentResponse attachDocument(UUID claimId, AttachClaimDocumentRequest request);
 
-    void uploadDocuments(UUID claimId, MultipartFile[] files);
+    List<ClaimDocumentResponse> uploadDocuments(UUID claimId, MultipartFile[] files);
 
     List<ClaimDocumentResponse> listDocuments(UUID claimId);
 

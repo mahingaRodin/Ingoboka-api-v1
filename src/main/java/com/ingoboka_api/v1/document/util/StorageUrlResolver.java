@@ -19,6 +19,9 @@ public class StorageUrlResolver {
         if (objectKey.startsWith("http://") || objectKey.startsWith("https://")) {
             return objectKey;
         }
+        if (DocumentUrlBuilder.isClaimEvidenceObjectKey(objectKey)) {
+            return null;
+        }
         if (!minioProperties.isEnabled()) {
             return null;
         }

@@ -31,11 +31,17 @@ public interface ClaimRepository extends JpaRepository<Claim, UUID> {
 
     long countByOrganizationIdAndStatusIn(UUID organizationId, Collection<ClaimStatus> statuses);
 
+    Page<Claim> findByOrganizationIdAndStatusNotOrderByCreatedAtDesc(
+            UUID organizationId, ClaimStatus status, Pageable pageable);
+
+    List<Claim> findByOrganizationIdAndStatusNotOrderByCreatedAtDesc(UUID organizationId, ClaimStatus status);
+
     @Query(
             """
             SELECT c FROM Claim c
             LEFT JOIN CitizenProfile cp ON cp.id = c.citizenProfileId
             WHERE c.organizationId = :organizationId
+            AND c.status <> com.ingoboka_api.v1.common.enums.ClaimStatus.DRAFT
             AND (:status IS NULL OR c.status = :status)
             AND (:search IS NULL OR :search = '' OR LOWER(c.claimNumber) LIKE LOWER(CONCAT('%', :search, '%'))
                 OR LOWER(c.description) LIKE LOWER(CONCAT('%', :search, '%')))

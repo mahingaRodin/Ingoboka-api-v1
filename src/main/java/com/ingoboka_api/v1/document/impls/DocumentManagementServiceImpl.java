@@ -40,6 +40,10 @@ public class DocumentManagementServiceImpl implements DocumentManagementService 
     @Override
     @Transactional(readOnly = true)
     public UploadUrlResponse requestUploadUrl(String documentType, String mimeType) {
+        if (DocumentUrlBuilder.isClaimEvidenceDocumentType(documentType)) {
+            throw new BusinessException(
+                    "Claim evidence must be uploaded via POST /api/v1/claims/{claimId}/documents (multipart) — presigned MinIO URLs are not allowed");
+        }
         String objectKey = "docs/"
                 + SecurityUtils.currentUser().getUserId() + "/"
                 + documentType + "-"
@@ -58,7 +62,7 @@ public class DocumentManagementServiceImpl implements DocumentManagementService 
                 .findById(documentId)
                 .orElseThrow(() -> new BusinessException("Document not found"));
         assertCanAccess(doc);
-        String downloadUrl = resolveClientDownloadUrl(documentId, doc.getObjectKey());
+        String downloadUrl = resolveClientDownloadUrl(documentId, doc);
         return DownloadUrlResponse.builder()
                 .objectKey(doc.getObjectKey())
                 .downloadUrl(downloadUrl)
@@ -193,15 +197,26 @@ public class DocumentManagementServiceImpl implements DocumentManagementService 
                 .accessClassification(doc.getAccessClassification())
                 .retentionUntil(doc.getRetentionUntil())
                 .createdAt(doc.getCreatedAt())
-                .contentUrl(DocumentUrlBuilder.documentContentUrl(doc.getId()))
+                .contentUrl(resolveDocumentContentUrl(doc))
                 .build();
     }
 
-    private String resolveClientDownloadUrl(UUID documentId, String objectKey) {
-        if (minioProperties.isPublicEndpointBrowserReachable()) {
-            return documentStorageService.presignedDownloadUrl(objectKey);
+    private String resolveDocumentContentUrl(DocumentRegistry doc) {
+        return DocumentUrlBuilder.resolveStoredDocumentContentUrl(
+                doc.getId(), doc.getEntityType(), doc.getEntityId(), doc.getDocumentType());
+    }
+
+    private String resolveClientDownloadUrl(UUID documentId, DocumentRegistry doc) {
+        String apiContentUrl = resolveDocumentContentUrl(doc);
+        if (DocumentUrlBuilder.isClaimEvidenceDocumentType(doc.getDocumentType())
+                || DocumentUrlBuilder.isClaimEvidenceObjectKey(doc.getObjectKey())) {
+            return apiContentUrl;
         }
-        return DocumentUrlBuilder.documentContentUrl(documentId);
+        if (minioProperties.isPublicEndpointBrowserReachable()) {
+            String presigned = documentStorageService.presignedDownloadUrl(doc.getObjectKey());
+            return DocumentUrlBuilder.sanitizeClientUrl(presigned, apiContentUrl);
+        }
+        return apiContentUrl;
     }
 
     private static String extractFileName(String objectKey) {
