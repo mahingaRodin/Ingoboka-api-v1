@@ -93,13 +93,24 @@ public class MinioDocumentStorageService implements DocumentStorageService {
     @Override
     public String presignedDownloadUrl(String objectKey) {
         ensureClient();
+        if (!minioProperties.isPublicEndpointBrowserReachable()) {
+            throw new BusinessException(
+                    "Presigned download URLs require MINIO_PUBLIC_ENDPOINT; use the API content proxy instead");
+        }
         try {
-            return presignClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+            String url = presignClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(Method.GET)
                     .bucket(minioProperties.getBucket())
                     .object(objectKey)
                     .expiry(minioProperties.getPresignedExpiryMinutes(), TimeUnit.MINUTES)
                     .build());
+            if (containsInternalHost(url)) {
+                throw new BusinessException(
+                        "Presigned download URL is not browser-reachable; configure MINIO_PUBLIC_ENDPOINT");
+            }
+            return url;
+        } catch (BusinessException ex) {
+            throw ex;
         } catch (Exception ex) {
             log.error("Failed to generate download URL for {}: {}", objectKey, ex.getMessage(), ex);
             throw new BusinessException("Failed to generate download URL");
@@ -175,5 +186,16 @@ public class MinioDocumentStorageService implements DocumentStorageService {
         if (minioClient == null) {
             throw new BusinessException("Object storage is not available");
         }
+    }
+
+    private static boolean containsInternalHost(String url) {
+        if (url == null || url.isBlank()) {
+            return true;
+        }
+        String lower = url.toLowerCase();
+        return lower.contains("://minio:")
+                || lower.contains("://minio/")
+                || lower.startsWith("http://minio")
+                || lower.startsWith("https://minio");
     }
 }

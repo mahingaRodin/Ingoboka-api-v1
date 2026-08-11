@@ -8,9 +8,12 @@ import com.ingoboka_api.v1.common.requests.RecordClaimDecisionRequest;
 import com.ingoboka_api.v1.common.requests.UpdateClaimRequest;
 import com.ingoboka_api.v1.common.requests.UpdateClaimStatusRequest;
 import com.ingoboka_api.v1.common.responses.ClaimAppealResponse;
+import com.ingoboka_api.v1.common.responses.ClaimDocumentResponse;
 import com.ingoboka_api.v1.common.responses.ClaimsBreakdownResponse;
 import com.ingoboka_api.v1.common.responses.ClaimResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
+import com.ingoboka_api.v1.document.model.DocumentContent;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -49,6 +52,10 @@ public interface ClaimService {
     void attachDocument(UUID claimId, AttachClaimDocumentRequest request);
 
     void uploadDocuments(UUID claimId, MultipartFile[] files);
+
+    List<ClaimDocumentResponse> listDocuments(UUID claimId);
+
+    DocumentContent openDocumentContent(UUID claimId, UUID documentId);
 
     ClaimAppealResponse createAppeal(UUID claimId, CreateClaimAppealRequest request);
 

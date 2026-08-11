@@ -255,11 +255,11 @@ USSD_ENABLED=true
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=<strong-minio-password>
 MINIO_BUCKET=ingoboka-documents
-# Optional — only for presigned product/document download URLs in the browser:
+# Optional — only for presigned product PDF/image download URLs in the browser:
 # MINIO_PUBLIC_ENDPOINT=http://YOUR_IP:9000
 ```
 
-**Profile photos** and **claim evidence uploads** go through the API (multipart to `/api/v1/claims/{id}/documents`; avatars at `GET /api/v1/users/me/profile-picture/content`). The browser never needs direct MinIO access for those flows — **NSG port 9000 is not required for claim uploads**.
+**Profile photos**, **claim evidence upload**, and **claim evidence viewing** go through the API (`GET /api/v1/claims/{id}/documents`, `GET /api/v1/claims/{id}/documents/{docId}/content`; avatars at `GET /api/v1/users/me/profile-picture/content`). The browser never needs direct MinIO access for those flows — **NSG port 9000 is not required for claim documents**.
 
 **Example (Azure demo VM `4.168.192.169`):**
 
@@ -306,7 +306,7 @@ Copy the rest from `deploy/.env.example` (SMS / AT flags as needed).
 |---------|--------|
 | Swagger timeout | NSG rule for **8085**, `docker compose ps`, `curl localhost:8085/actuator/health` on VM |
 | Frontend CORS errors | `CORS_ALLOWED_ORIGINS` includes the Vercel origin exactly |
-| Profile images / documents 404 or blank | Profile avatars use API proxy (`/users/me/profile-picture/content`); claim uploads use multipart `POST /claims/{id}/documents` through the API; for product presigned URLs set `MINIO_PUBLIC_ENDPOINT=http://YOUR_IP:9000` and open NSG port 9000; check `docker compose logs api` for MinIO warnings |
+| Profile images / documents 404 or blank | Claim evidence uses API proxy (`GET /claims/{id}/documents/{docId}/content`); profile avatars use `GET /users/me/profile-picture/content`; for **product** presigned URLs set `MINIO_PUBLIC_ENDPOINT=http://YOUR_IP:9000` and open NSG port 9000; check `docker compose logs api` for MinIO warnings |
 | USSD “technical problems” | AT callback URL = new IP; API logs `USSD response ... CON` |
 | CI deploy fails SSH | `SERVER_HOST` / key / username; VM running |
 | OOM / API crash | Resize VM to **B2ms** |

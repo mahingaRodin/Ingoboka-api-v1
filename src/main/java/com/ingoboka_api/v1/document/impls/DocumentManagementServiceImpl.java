@@ -1,6 +1,7 @@
 package com.ingoboka_api.v1.document.impls;
 
 import com.ingoboka_api.v1.audit.services.AuditComplianceService;
+import com.ingoboka_api.v1.common.config.MinioProperties;
 import com.ingoboka_api.v1.common.enums.DocumentAccessClassification;
 import com.ingoboka_api.v1.common.enums.DocumentEntityType;
 import com.ingoboka_api.v1.common.enums.MalwareScanStatus;
@@ -14,9 +15,11 @@ import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.document.models.DocumentRegistry;
+import com.ingoboka_api.v1.document.model.DocumentContent;
 import com.ingoboka_api.v1.document.repositories.DocumentRegistryRepository;
 import com.ingoboka_api.v1.document.services.DocumentManagementService;
 import com.ingoboka_api.v1.document.services.DocumentStorageService;
+import com.ingoboka_api.v1.document.util.DocumentUrlBuilder;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import java.time.Instant;
 import java.util.UUID;
@@ -32,6 +35,7 @@ public class DocumentManagementServiceImpl implements DocumentManagementService 
     private final DocumentRegistryRepository documentRegistryRepository;
     private final AuditComplianceService auditComplianceService;
     private final DocumentStorageService documentStorageService;
+    private final MinioProperties minioProperties;
 
     @Override
     @Transactional(readOnly = true)
@@ -54,11 +58,23 @@ public class DocumentManagementServiceImpl implements DocumentManagementService 
                 .findById(documentId)
                 .orElseThrow(() -> new BusinessException("Document not found"));
         assertCanAccess(doc);
+        String downloadUrl = resolveClientDownloadUrl(documentId, doc.getObjectKey());
         return DownloadUrlResponse.builder()
                 .objectKey(doc.getObjectKey())
-                .downloadUrl(documentStorageService.presignedDownloadUrl(doc.getObjectKey()))
+                .downloadUrl(downloadUrl)
                 .expiresInMinutes(60)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentContent openDocumentContent(UUID documentId) {
+        DocumentRegistry doc = documentRegistryRepository
+                .findById(documentId)
+                .orElseThrow(() -> new BusinessException("Document not found"));
+        assertCanAccess(doc);
+        return new DocumentContent(
+                documentStorageService.open(doc.getObjectKey()), extractFileName(doc.getObjectKey()));
     }
 
     private String guessExtension(String mimeType) {
@@ -177,6 +193,30 @@ public class DocumentManagementServiceImpl implements DocumentManagementService 
                 .accessClassification(doc.getAccessClassification())
                 .retentionUntil(doc.getRetentionUntil())
                 .createdAt(doc.getCreatedAt())
+                .contentUrl(DocumentUrlBuilder.documentContentUrl(doc.getId()))
                 .build();
+    }
+
+    private String resolveClientDownloadUrl(UUID documentId, String objectKey) {
+        if (minioProperties.isPublicEndpointBrowserReachable()) {
+            return documentStorageService.presignedDownloadUrl(objectKey);
+        }
+        return DocumentUrlBuilder.documentContentUrl(documentId);
+    }
+
+    private static String extractFileName(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return "document";
+        }
+        int lastSlash = objectKey.lastIndexOf('/');
+        String segment = lastSlash >= 0 ? objectKey.substring(lastSlash + 1) : objectKey;
+        int dash = segment.indexOf('-');
+        if (dash > 0) {
+            String prefix = segment.substring(0, dash);
+            if (prefix.length() == 36 && prefix.chars().filter(ch -> ch == '-').count() == 4) {
+                return segment.substring(dash + 1);
+            }
+        }
+        return segment;
     }
 }

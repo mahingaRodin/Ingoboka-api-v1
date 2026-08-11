@@ -34,12 +34,22 @@ class StorageUrlResolverTest {
 
     @Test
     void presignsStorageKeyWhenMinioEnabled() {
+        minioProperties.setPublicEndpoint("http://20.1.2.3:9000");
         when(documentStorageService.presignedDownloadUrl("users/abc/profile.jpg"))
                 .thenReturn("http://20.1.2.3:9000/ingoboka-documents/users/abc/profile.jpg?X-Amz-Signature=abc");
 
         String resolved = resolver.resolveDownloadUrl("users/abc/profile.jpg");
 
         assertThat(resolved).contains("20.1.2.3:9000");
+    }
+
+    @Test
+    void returnsNullWhenPublicEndpointNotBrowserReachable() {
+        minioProperties.setEndpoint("http://minio:9000");
+        minioProperties.setPublicEndpoint(null);
+
+        assertThat(resolver.resolveDownloadUrl("users/abc/profile.jpg")).isNull();
+        verifyNoInteractions(documentStorageService);
     }
 
     @Test
