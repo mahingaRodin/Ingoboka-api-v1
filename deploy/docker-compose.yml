@@ -95,7 +95,7 @@ services:
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://ingoboka-platform.vercel.app/en}
       BRAND_LOGO_URL: ${BRAND_LOGO_URL:-https://ingoboka-platform.vercel.app/images/brand/ingoboka-logo.svg}
       MINIO_ENDPOINT: http://minio:9000
-      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-ingoboka-documents}

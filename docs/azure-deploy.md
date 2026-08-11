@@ -255,23 +255,24 @@ USSD_ENABLED=true
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=<strong-minio-password>
 MINIO_BUCKET=ingoboka-documents
-# For presigned document/product URLs (profile avatars use the API proxy instead)
-MINIO_PUBLIC_ENDPOINT=http://YOUR_IP:9000
+# Optional — only for presigned product/document download URLs in the browser:
+# MINIO_PUBLIC_ENDPOINT=http://YOUR_IP:9000
 ```
 
-**Profile photos** are streamed through the API (`GET /api/v1/users/me/profile-picture/content`) so avatars work even when MinIO port 9000 is closed to the public.
+**Profile photos** and **claim evidence uploads** go through the API (multipart to `/api/v1/claims/{id}/documents`; avatars at `GET /api/v1/users/me/profile-picture/content`). The browser never needs direct MinIO access for those flows — **NSG port 9000 is not required for claim uploads**.
 
 **Example (Azure demo VM `4.168.192.169`):**
 
 ```env
 API_PORT=8085
-MINIO_PUBLIC_ENDPOINT=http://4.168.192.169:9000
+# Leave unset unless product PDFs/images must load presigned URLs from the browser:
+# MINIO_PUBLIC_ENDPOINT=http://4.168.192.169:9000
 # MinIO console (restrict NSG to your IP): http://4.168.192.169:9001
-# MinIO API (object storage):              http://4.168.192.169:9000
+# MinIO API (internal + optional presigned): http://4.168.192.169:9000
 # If deploy/.env sets MINIO_API_PORT=9010, use :9010 (and MINIO_CONSOLE_PORT=9011 → :9011 for console)
 ```
 
-Open NSG port **9000** (MinIO API) to **Any** only if the Vercel frontend must load **documents** via presigned URLs. Restrict **9001** (console) to your IP only.
+Open NSG port **9000** (MinIO API) to **Any** only if the Vercel frontend must load **product documents or hero images** via presigned URLs. Restrict **9001** (console) to your IP only.
 
 The API container always uses `MINIO_ENDPOINT=http://minio:9000` internally; only presigned URLs use `MINIO_PUBLIC_ENDPOINT`.
 
@@ -305,7 +306,7 @@ Copy the rest from `deploy/.env.example` (SMS / AT flags as needed).
 |---------|--------|
 | Swagger timeout | NSG rule for **8085**, `docker compose ps`, `curl localhost:8085/actuator/health` on VM |
 | Frontend CORS errors | `CORS_ALLOWED_ORIGINS` includes the Vercel origin exactly |
-| Profile images / documents 404 or blank | Profile avatars use API proxy (`/users/me/profile-picture/content`); for documents set `MINIO_PUBLIC_ENDPOINT=http://YOUR_IP:9000`, open NSG port 9000; check `docker compose logs api` for MinIO warnings |
+| Profile images / documents 404 or blank | Profile avatars use API proxy (`/users/me/profile-picture/content`); claim uploads use multipart `POST /claims/{id}/documents` through the API; for product presigned URLs set `MINIO_PUBLIC_ENDPOINT=http://YOUR_IP:9000` and open NSG port 9000; check `docker compose logs api` for MinIO warnings |
 | USSD “technical problems” | AT callback URL = new IP; API logs `USSD response ... CON` |
 | CI deploy fails SSH | `SERVER_HOST` / key / username; VM running |
 | OOM / API crash | Resize VM to **B2ms** |

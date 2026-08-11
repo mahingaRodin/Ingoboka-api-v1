@@ -40,6 +40,8 @@ public class MinioProperties {
         return !lower.contains("://minio:")
                 && !lower.contains("://minio/")
                 && !lower.startsWith("http://minio")
-                && !lower.startsWith("https://minio");
+                && !lower.startsWith("https://minio")
+                && !lower.contains("://localhost")
+                && !lower.contains("://127.0.0.1");
     }
 }

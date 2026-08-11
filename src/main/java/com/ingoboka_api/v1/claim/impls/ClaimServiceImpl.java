@@ -33,9 +33,11 @@ import com.ingoboka_api.v1.common.responses.ClaimStatusHistoryItemResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
+import com.ingoboka_api.v1.common.util.HashUtils;
 import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.customer.models.CitizenProfile;
 import com.ingoboka_api.v1.customer.repositories.CitizenProfileRepository;
+import com.ingoboka_api.v1.document.services.DocumentStorageService;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.messaging.services.InsurerStaffNotificationService;
@@ -46,6 +48,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Arrays;
@@ -57,6 +61,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -89,6 +94,7 @@ public class ClaimServiceImpl implements ClaimService {
     private final InsurerStaffNotificationService insurerStaffNotificationService;
     private final AuditComplianceService auditComplianceService;
     private final UserRepository userRepository;
+    private final DocumentStorageService documentStorageService;
 
     @Override
     @Transactional
@@ -384,6 +390,51 @@ public class ClaimServiceImpl implements ClaimService {
                         : DocumentAccessClassification.INTERNAL);
         document.setCreatedAt(Instant.now());
         claimDocumentRepository.save(document);
+    }
+
+    @Override
+    @Transactional
+    public void uploadDocuments(UUID claimId, MultipartFile[] files) {
+        if (files == null || files.length == 0) {
+            throw new BusinessException("At least one file is required");
+        }
+        int uploaded = 0;
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) {
+                continue;
+            }
+            String filename = file.getOriginalFilename();
+            if (filename == null || filename.isBlank()) {
+                filename = "document";
+            }
+            filename = filename.replace("\\", "_").replace("/", "_");
+            String objectKey = "claims/" + claimId + "/" + UUID.randomUUID() + "-" + filename;
+            String contentType =
+                    file.getContentType() != null && !file.getContentType().isBlank()
+                            ? file.getContentType()
+                            : "application/octet-stream";
+            long size = file.getSize();
+            try {
+                byte[] bytes = file.getBytes();
+                String checksum = HashUtils.sha256(bytes);
+                documentStorageService.upload(
+                        objectKey, new ByteArrayInputStream(bytes), size, contentType);
+
+                AttachClaimDocumentRequest attachReq = new AttachClaimDocumentRequest();
+                attachReq.setDocumentType("CLAIM_EVIDENCE");
+                attachReq.setObjectKey(objectKey);
+                attachReq.setMimeType(contentType);
+                attachReq.setSizeBytes(size);
+                attachReq.setChecksum(checksum != null ? checksum : "unknown");
+                attachDocument(claimId, attachReq);
+                uploaded++;
+            } catch (IOException ex) {
+                throw new BusinessException("Failed to read uploaded file: " + ex.getMessage());
+            }
+        }
+        if (uploaded == 0) {
+            throw new BusinessException("At least one non-empty file is required");
+        }
     }
 
     @Override

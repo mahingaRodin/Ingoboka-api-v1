@@ -39,18 +39,20 @@ public class MinioDocumentStorageService implements DocumentStorageService {
         }
         minioClient = buildClient(minioProperties.getEndpoint());
         String publicEndpoint = minioProperties.getEffectivePublicEndpoint();
-        presignClient = publicEndpoint.equals(minioProperties.getEndpoint())
-                ? minioClient
-                : buildClient(publicEndpoint);
-        if (!minioProperties.isPublicEndpointBrowserReachable()) {
-            log.warn(
-                    "MinIO public endpoint {} is not browser-reachable — presigned document URLs may fail in the browser; profile pictures are served via the API proxy",
-                    publicEndpoint);
-        } else if (!publicEndpoint.equals(minioProperties.getEndpoint())) {
+        if (minioProperties.isPublicEndpointBrowserReachable()
+                && !publicEndpoint.equals(minioProperties.getEndpoint())) {
+            presignClient = buildClient(publicEndpoint);
             log.info(
                     "MinIO presigned URLs will use public endpoint {} (internal: {})",
                     publicEndpoint,
                     minioProperties.getEndpoint());
+        } else {
+            presignClient = minioClient;
+            if (!minioProperties.isPublicEndpointBrowserReachable()) {
+                log.warn(
+                        "MinIO public endpoint {} is not browser-reachable — presigned document URLs may fail in the browser; profile photos and claim uploads are served via the API proxy",
+                        publicEndpoint);
+            }
         }
         try {
             boolean exists = minioClient.bucketExists(
@@ -99,6 +101,7 @@ public class MinioDocumentStorageService implements DocumentStorageService {
                     .expiry(minioProperties.getPresignedExpiryMinutes(), TimeUnit.MINUTES)
                     .build());
         } catch (Exception ex) {
+            log.error("Failed to generate download URL for {}: {}", objectKey, ex.getMessage(), ex);
             throw new BusinessException("Failed to generate download URL");
         }
     }
@@ -136,6 +139,7 @@ public class MinioDocumentStorageService implements DocumentStorageService {
                     .expiry(minioProperties.getPresignedExpiryMinutes(), TimeUnit.MINUTES)
                     .build());
         } catch (Exception ex) {
+            log.error("Failed to generate upload URL for {}: {}", objectKey, ex.getMessage(), ex);
             throw new BusinessException("Failed to generate upload URL");
         }
     }

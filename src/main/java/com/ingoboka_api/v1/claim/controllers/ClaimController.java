@@ -18,6 +18,7 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,8 +27,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/claims")
@@ -101,14 +104,24 @@ public class ClaimController {
         return ApiResponse.ok("Claim cancelled", claimService.cancelClaim(claimId));
     }
 
-    @PostMapping("/{claimId}/documents")
+    @PostMapping(value = "/{claimId}/documents", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('CITIZEN', 'CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR')")
-    @Operation(summary = "Attach claim document metadata")
+    @Operation(summary = "Attach claim document metadata (after direct MinIO upload)")
     public ApiResponse<Void> attachDocument(
             @PathVariable UUID claimId, @Valid @RequestBody AttachClaimDocumentRequest request) {
         claimService.attachDocument(claimId, request);
         return ApiResponse.ok("Document attached", null);
+    }
+
+    @PostMapping(value = "/{claimId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('CITIZEN', 'CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR')")
+    @Operation(summary = "Upload claim document files (API proxy to MinIO)")
+    public ApiResponse<Void> uploadDocuments(
+            @PathVariable UUID claimId, @RequestPart("files") MultipartFile[] files) {
+        claimService.uploadDocuments(claimId, files);
+        return ApiResponse.ok("Documents uploaded", null);
     }
 
     @PostMapping("/{claimId}/appeals")

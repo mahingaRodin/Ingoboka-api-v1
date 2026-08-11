@@ -12,6 +12,7 @@ import com.ingoboka_api.v1.common.responses.ClaimsBreakdownResponse;
 import com.ingoboka_api.v1.common.responses.ClaimResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import java.util.UUID;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface ClaimService {
 
@@ -46,6 +47,8 @@ public interface ClaimService {
     ClaimResponse recordDecision(UUID claimId, RecordClaimDecisionRequest request);
 
     void attachDocument(UUID claimId, AttachClaimDocumentRequest request);
+
+    void uploadDocuments(UUID claimId, MultipartFile[] files);
 
     ClaimAppealResponse createAppeal(UUID claimId, CreateClaimAppealRequest request);
 
