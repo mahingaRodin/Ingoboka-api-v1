@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ingoboka_api.v1.document.services.DocumentStorageService;
+
 import com.ingoboka_api.v1.audit.services.AuditComplianceService;
 import com.ingoboka_api.v1.claim.impls.ClaimServiceImpl;
 import com.ingoboka_api.v1.claim.models.Claim;
@@ -79,6 +81,9 @@ class ClaimServiceValidationTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private DocumentStorageService documentStorageService;
 
     @InjectMocks
     private ClaimServiceImpl claimService;
@@ -156,6 +161,56 @@ class ClaimServiceValidationTest {
 
         BusinessException ex = assertThrows(BusinessException.class, () -> claimService.updateStatus(claimId, request));
         assertEquals("A reason is required for this claim decision", ex.getMessage());
+    }
+
+    @Test
+    void deleteDraftClaimRemovesOwnedDraft() {
+        Claim claim = draftClaim();
+        CitizenProfile profile = new CitizenProfile();
+        profile.setId(citizenProfileId);
+
+        when(citizenProfileRepository.findByUserId(userId)).thenReturn(Optional.of(profile));
+        when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+
+        claimService.deleteDraftClaim(claimId);
+
+        verify(claimRepository).delete(claim);
+        verify(auditComplianceService).log("CLAIM_DELETED", "CLAIM", claimId, "Draft claim deleted by policyholder");
+    }
+
+    @Test
+    void deleteSubmittedClaimIsRejected() {
+        Claim claim = draftClaim();
+        claim.setStatus(ClaimStatus.SUBMITTED);
+        CitizenProfile profile = new CitizenProfile();
+        profile.setId(citizenProfileId);
+
+        when(citizenProfileRepository.findByUserId(userId)).thenReturn(Optional.of(profile));
+        when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> claimService.deleteDraftClaim(claimId));
+        assertEquals("Only draft claims can be deleted", ex.getMessage());
+    }
+
+    @Test
+    void tenantListingDraftStatusFilterIsRejected() {
+        UUID orgId = UUID.randomUUID();
+        authenticateAs(buildUser(UUID.randomUUID(), orgId, RoleCodes.CLAIMS_OFFICER));
+
+        BusinessException ex = assertThrows(
+                BusinessException.class, () -> claimService.listTenantClaimsFiltered(
+                        ClaimStatus.DRAFT, null, null, null, "createdAt", "desc", 0, 20));
+        assertEquals("Draft claims are not visible to insurer staff", ex.getMessage());
+    }
+
+    @Test
+    void insurerCannotAccessDraftClaimDetail() {
+        UUID orgId = UUID.randomUUID();
+        authenticateAs(buildUser(UUID.randomUUID(), orgId, RoleCodes.CLAIMS_OFFICER));
+        when(claimRepository.findById(claimId)).thenReturn(Optional.of(draftClaim()));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> claimService.getClaim(claimId));
+        assertEquals("Access denied to this claim", ex.getMessage());
     }
 
     private void authenticateAs(User user) {

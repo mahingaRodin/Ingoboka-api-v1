@@ -100,8 +100,8 @@ public class ReportingServiceImpl implements ReportingService {
     @Transactional(readOnly = true)
     public PageResponse<?> getClaimReport(int page, int size) {
         UUID orgId = requireTenantOrganizationId();
-        var result = claimRepository.findByOrganizationIdOrderByCreatedAtDesc(
-                orgId, PaginationUtils.toPageable(page, size));
+        var result = claimRepository.findByOrganizationIdAndStatusNotOrderByCreatedAtDesc(
+                orgId, ClaimStatus.DRAFT, PaginationUtils.toPageable(page, size));
         return PageResponse.from(result.map(c -> java.util.Map.of(
                 "id", c.getId(),
                 "claimNumber", c.getClaimNumber(),
@@ -144,7 +144,7 @@ public class ReportingServiceImpl implements ReportingService {
     public String exportClaimsCsv() {
         UUID orgId = requireTenantOrganizationId();
         String header = "claimNumber,status,claimedAmount,createdAt\n";
-        String rows = claimRepository.findByOrganizationIdOrderByCreatedAtDesc(orgId).stream()
+        String rows = claimRepository.findByOrganizationIdAndStatusNotOrderByCreatedAtDesc(orgId, ClaimStatus.DRAFT).stream()
                 .map(c -> c.getClaimNumber() + ","
                         + c.getStatus() + ","
                         + c.getClaimedAmount() + ","

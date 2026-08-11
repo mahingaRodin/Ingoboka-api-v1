@@ -59,4 +59,12 @@ class StorageUrlResolverTest {
         assertThat(resolver.resolveDownloadUrl("users/abc/profile.jpg")).isNull();
         verifyNoInteractions(documentStorageService);
     }
+
+    @Test
+    void returnsNullForClaimEvidenceObjectKeys() {
+        minioProperties.setPublicEndpoint("http://20.1.2.3:9000");
+
+        assertThat(resolver.resolveDownloadUrl("docs/user/CLAIM_EVIDENCE-abc.pdf")).isNull();
+        verifyNoInteractions(documentStorageService);
+    }
 }

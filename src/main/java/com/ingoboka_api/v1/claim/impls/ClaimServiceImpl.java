@@ -72,7 +72,7 @@ public class ClaimServiceImpl implements ClaimService {
 
     private static final Set<ClaimStatus> APPEALABLE = Set.of(ClaimStatus.REJECTED, ClaimStatus.APPROVED);
 
-    private static final Set<ClaimStatus> CANCELLABLE = Set.of(ClaimStatus.DRAFT, ClaimStatus.SUBMITTED);
+    private static final Set<ClaimStatus> CANCELLABLE = Set.of(ClaimStatus.SUBMITTED);
 
     private static final Map<String, List<String>> PROVINCE_DISTRICTS = buildProvinceDistricts();
 
@@ -161,6 +161,17 @@ public class ClaimServiceImpl implements ClaimService {
     }
 
     @Override
+    @Transactional
+    public void deleteDraftClaim(UUID claimId) {
+        Claim claim = requireOwnedClaim(claimId);
+        if (claim.getStatus() != ClaimStatus.DRAFT) {
+            throw new BusinessException("Only draft claims can be deleted");
+        }
+        claimRepository.delete(claim);
+        auditComplianceService.log("CLAIM_DELETED", "CLAIM", claimId, "Draft claim deleted by policyholder");
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public ClaimResponse getClaim(UUID claimId) {
         Claim claim = claimRepository
@@ -196,6 +207,9 @@ public class ClaimServiceImpl implements ClaimService {
             String sortDir,
             int page,
             int size) {
+        if (status == ClaimStatus.DRAFT) {
+            throw new BusinessException("Draft claims are not visible to insurer staff");
+        }
         UUID orgId = requireClaimsOrganizationId();
         List<String> districtsInProvince = Collections.emptyList();
         if (province != null && !province.isBlank()) {
@@ -373,7 +387,7 @@ public class ClaimServiceImpl implements ClaimService {
 
     @Override
     @Transactional
-    public void attachDocument(UUID claimId, AttachClaimDocumentRequest request) {
+    public ClaimDocumentResponse attachDocument(UUID claimId, AttachClaimDocumentRequest request) {
         Claim claim = claimRepository
                 .findById(claimId)
                 .orElseThrow(() -> new BusinessException("Claim not found"));
@@ -393,15 +407,16 @@ public class ClaimServiceImpl implements ClaimService {
                         : DocumentAccessClassification.INTERNAL);
         document.setCreatedAt(Instant.now());
         claimDocumentRepository.save(document);
+        return toDocumentResponse(claimId, document);
     }
 
     @Override
     @Transactional
-    public void uploadDocuments(UUID claimId, MultipartFile[] files) {
+    public List<ClaimDocumentResponse> uploadDocuments(UUID claimId, MultipartFile[] files) {
         if (files == null || files.length == 0) {
             throw new BusinessException("At least one file is required");
         }
-        int uploaded = 0;
+        List<ClaimDocumentResponse> uploadedDocuments = new java.util.ArrayList<>();
         for (MultipartFile file : files) {
             if (file == null || file.isEmpty()) {
                 continue;
@@ -429,15 +444,15 @@ public class ClaimServiceImpl implements ClaimService {
                 attachReq.setMimeType(contentType);
                 attachReq.setSizeBytes(size);
                 attachReq.setChecksum(checksum != null ? checksum : "unknown");
-                attachDocument(claimId, attachReq);
-                uploaded++;
+                uploadedDocuments.add(attachDocument(claimId, attachReq));
             } catch (IOException ex) {
                 throw new BusinessException("Failed to read uploaded file: " + ex.getMessage());
             }
         }
-        if (uploaded == 0) {
+        if (uploadedDocuments.isEmpty()) {
             throw new BusinessException("At least one non-empty file is required");
         }
+        return uploadedDocuments;
     }
 
     @Override
@@ -471,6 +486,7 @@ public class ClaimServiceImpl implements ClaimService {
     }
 
     private ClaimDocumentResponse toDocumentResponse(UUID claimId, ClaimDocument document) {
+        String contentUrl = DocumentUrlBuilder.claimDocumentContentUrl(claimId, document.getId());
         return ClaimDocumentResponse.builder()
                 .id(document.getId())
                 .claimId(document.getClaimId())
@@ -478,7 +494,7 @@ public class ClaimServiceImpl implements ClaimService {
                 .mimeType(document.getMimeType())
                 .sizeBytes(document.getSizeBytes())
                 .fileName(extractDocumentFileName(document.getObjectKey()))
-                .contentUrl(DocumentUrlBuilder.claimDocumentContentUrl(claimId, document.getId()))
+                .contentUrl(contentUrl)
                 .createdAt(document.getCreatedAt())
                 .build();
     }
@@ -559,6 +575,21 @@ public class ClaimServiceImpl implements ClaimService {
 
     private void assertCanAccessClaim(Claim claim) {
         IngobokaUserDetails user = SecurityUtils.currentUser();
+        if (claim.getStatus() == ClaimStatus.DRAFT) {
+            if (user.hasRole(RoleCodes.CLAIMS_OFFICER)
+                    || user.hasRole(RoleCodes.CLAIMS_SUPERVISOR)
+                    || user.hasRole(RoleCodes.PARTNER_ADMIN)
+                    || user.hasRole(RoleCodes.PLATFORM_ADMIN)) {
+                throw new BusinessException("Access denied to this claim");
+            }
+            CitizenProfile profile = citizenProfileRepository
+                    .findByUserId(user.getUserId())
+                    .orElseThrow(() -> new BusinessException("Access denied"));
+            if (!claim.getCitizenProfileId().equals(profile.getId())) {
+                throw new BusinessException("Access denied to this claim");
+            }
+            return;
+        }
         if (user.hasRole(RoleCodes.PLATFORM_ADMIN)) {
             return;
         }
@@ -580,6 +611,9 @@ public class ClaimServiceImpl implements ClaimService {
 
     private void assertTenantAccess(Claim claim) {
         IngobokaUserDetails user = SecurityUtils.currentUser();
+        if (claim.getStatus() == ClaimStatus.DRAFT) {
+            throw new BusinessException("Access denied to this claim");
+        }
         if (user.hasRole(RoleCodes.PLATFORM_ADMIN)) {
             return;
         }
@@ -741,8 +775,10 @@ public class ClaimServiceImpl implements ClaimService {
             throw new BusinessException("No organization associated with this account");
         }
         List<Claim> claims = orgId != null
-                ? claimRepository.findByOrganizationIdOrderByCreatedAtDesc(orgId)
-                : claimRepository.findAll();
+                ? claimRepository.findByOrganizationIdAndStatusNotOrderByCreatedAtDesc(orgId, ClaimStatus.DRAFT)
+                : claimRepository.findAll().stream()
+                        .filter(claim -> claim.getStatus() != ClaimStatus.DRAFT)
+                        .toList();
         Instant startOfDay = LocalDate.now(ZoneOffset.UTC).atStartOfDay().toInstant(ZoneOffset.UTC);
         long resolvedToday = claims.stream()
                 .filter(claim -> claim.getStatus() == ClaimStatus.APPROVED || claim.getStatus() == ClaimStatus.REJECTED)

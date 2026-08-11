@@ -126,7 +126,7 @@ public class InsurerAnalyticsServiceImpl implements InsurerAnalyticsService {
                         orgId, ApplicationStatus.SUBMITTED)
                 + policyApplicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.UNDER_REVIEW);
 
-        List<Claim> claims = claimRepository.findByOrganizationIdOrderByCreatedAtDesc(orgId);
+        List<Claim> claims = claimRepository.findByOrganizationIdAndStatusNotOrderByCreatedAtDesc(orgId, ClaimStatus.DRAFT);
         Instant startOfDay = LocalDate.now(ZoneOffset.UTC).atStartOfDay().toInstant(ZoneOffset.UTC);
         long resolvedToday = claims.stream()
                 .filter(claim -> claim.getStatus() == ClaimStatus.APPROVED || claim.getStatus() == ClaimStatus.REJECTED)

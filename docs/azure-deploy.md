@@ -307,6 +307,20 @@ Copy the rest from `deploy/.env.example` (SMS / AT flags as needed).
 | Swagger timeout | NSG rule for **8085**, `docker compose ps`, `curl localhost:8085/actuator/health` on VM |
 | Frontend CORS errors | `CORS_ALLOWED_ORIGINS` includes the Vercel origin exactly |
 | Profile images / documents 404 or blank | Claim evidence uses API proxy (`GET /claims/{id}/documents/{docId}/content`); profile avatars use `GET /users/me/profile-picture/content`; for **product** presigned URLs set `MINIO_PUBLIC_ENDPOINT=http://YOUR_IP:9000` and open NSG port 9000; check `docker compose logs api` for MinIO warnings |
+| Claim View opens `minio:9000` | Redeploy **both** API and frontend; hard-refresh browser (Ctrl+Shift+R). Verify list response has only API paths — see curl below |
+
+**Post-deploy verification (claim documents must not contain `minio` in JSON):**
+
+```bash
+export API=http://YOUR_IP:8085/api/v1
+export TOKEN="<citizen or claims-officer accessToken>"
+export CLAIM_ID="<existing claim uuid>"
+
+curl -s "$API/claims/$CLAIM_ID/documents" \
+  -H "Authorization: Bearer $TOKEN" | grep -i minio && echo "FAIL: minio host in response" || echo "OK: no minio host"
+```
+
+Expect each item's `contentUrl` like `/api/v1/claims/{claimId}/documents/{docId}/content` only.
 | USSD “technical problems” | AT callback URL = new IP; API logs `USSD response ... CON` |
 | CI deploy fails SSH | `SERVER_HOST` / key / username; VM running |
 | OOM / API crash | Resize VM to **B2ms** |
