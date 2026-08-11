@@ -27,6 +27,7 @@ import com.ingoboka_api.v1.common.requests.RecordClaimDecisionRequest;
 import com.ingoboka_api.v1.common.requests.UpdateClaimRequest;
 import com.ingoboka_api.v1.common.requests.UpdateClaimStatusRequest;
 import com.ingoboka_api.v1.common.responses.ClaimAppealResponse;
+import com.ingoboka_api.v1.common.responses.ClaimDocumentResponse;
 import com.ingoboka_api.v1.common.responses.ClaimsBreakdownResponse;
 import com.ingoboka_api.v1.common.responses.ClaimResponse;
 import com.ingoboka_api.v1.common.responses.ClaimStatusHistoryItemResponse;
@@ -37,7 +38,9 @@ import com.ingoboka_api.v1.common.util.HashUtils;
 import com.ingoboka_api.v1.common.util.PaginationUtils;
 import com.ingoboka_api.v1.customer.models.CitizenProfile;
 import com.ingoboka_api.v1.customer.repositories.CitizenProfileRepository;
+import com.ingoboka_api.v1.document.model.DocumentContent;
 import com.ingoboka_api.v1.document.services.DocumentStorageService;
+import com.ingoboka_api.v1.document.util.DocumentUrlBuilder;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.messaging.services.InsurerStaffNotificationService;
@@ -435,6 +438,65 @@ public class ClaimServiceImpl implements ClaimService {
         if (uploaded == 0) {
             throw new BusinessException("At least one non-empty file is required");
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ClaimDocumentResponse> listDocuments(UUID claimId) {
+        Claim claim = claimRepository
+                .findById(claimId)
+                .orElseThrow(() -> new BusinessException("Claim not found"));
+        assertCanAccessClaim(claim);
+        return claimDocumentRepository.findByClaimIdOrderByCreatedAtAsc(claimId).stream()
+                .map(doc -> toDocumentResponse(claimId, doc))
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentContent openDocumentContent(UUID claimId, UUID documentId) {
+        Claim claim = claimRepository
+                .findById(claimId)
+                .orElseThrow(() -> new BusinessException("Claim not found"));
+        assertCanAccessClaim(claim);
+        ClaimDocument document = claimDocumentRepository
+                .findById(documentId)
+                .orElseThrow(() -> new BusinessException("Document not found"));
+        if (!document.getClaimId().equals(claimId)) {
+            throw new BusinessException("Document not found for this claim");
+        }
+        return new DocumentContent(
+                documentStorageService.open(document.getObjectKey()),
+                extractDocumentFileName(document.getObjectKey()));
+    }
+
+    private ClaimDocumentResponse toDocumentResponse(UUID claimId, ClaimDocument document) {
+        return ClaimDocumentResponse.builder()
+                .id(document.getId())
+                .claimId(document.getClaimId())
+                .documentType(document.getDocumentType())
+                .mimeType(document.getMimeType())
+                .sizeBytes(document.getSizeBytes())
+                .fileName(extractDocumentFileName(document.getObjectKey()))
+                .contentUrl(DocumentUrlBuilder.claimDocumentContentUrl(claimId, document.getId()))
+                .createdAt(document.getCreatedAt())
+                .build();
+    }
+
+    private static String extractDocumentFileName(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return "document";
+        }
+        int lastSlash = objectKey.lastIndexOf('/');
+        String segment = lastSlash >= 0 ? objectKey.substring(lastSlash + 1) : objectKey;
+        int dash = segment.indexOf('-');
+        if (dash > 0) {
+            String prefix = segment.substring(0, dash);
+            if (prefix.length() == 36 && prefix.chars().filter(ch -> ch == '-').count() == 4) {
+                return segment.substring(dash + 1);
+            }
+        }
+        return segment;
     }
 
     @Override

@@ -22,6 +22,9 @@ public class StorageUrlResolver {
         if (!minioProperties.isEnabled()) {
             return null;
         }
+        if (!minioProperties.isPublicEndpointBrowserReachable()) {
+            return null;
+        }
         try {
             return documentStorageService.presignedDownloadUrl(objectKey);
         } catch (RuntimeException ex) {

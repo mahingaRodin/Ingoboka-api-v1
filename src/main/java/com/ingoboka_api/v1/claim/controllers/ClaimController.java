@@ -9,17 +9,23 @@ import com.ingoboka_api.v1.common.requests.RecordClaimDecisionRequest;
 import com.ingoboka_api.v1.common.requests.UpdateClaimStatusRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.ClaimAppealResponse;
+import com.ingoboka_api.v1.common.responses.ClaimDocumentResponse;
 import com.ingoboka_api.v1.common.responses.ClaimResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import com.ingoboka_api.v1.document.model.DocumentContent;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -122,6 +128,27 @@ public class ClaimController {
             @PathVariable UUID claimId, @RequestPart("files") MultipartFile[] files) {
         claimService.uploadDocuments(claimId, files);
         return ApiResponse.ok("Documents uploaded", null);
+    }
+
+    @GetMapping("/{claimId}/documents")
+    @PreAuthorize("hasAnyRole('CITIZEN', 'CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
+    @Operation(summary = "List claim documents with API content URLs")
+    public ApiResponse<List<ClaimDocumentResponse>> listDocuments(@PathVariable UUID claimId) {
+        return ApiResponse.ok("Documents retrieved", claimService.listDocuments(claimId));
+    }
+
+    @GetMapping("/{claimId}/documents/{documentId}/content")
+    @PreAuthorize("hasAnyRole('CITIZEN', 'CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
+    @Operation(summary = "Stream claim document content (API proxy — no direct MinIO access needed)")
+    public ResponseEntity<InputStreamResource> streamDocumentContent(
+            @PathVariable UUID claimId, @PathVariable UUID documentId) {
+        DocumentContent content = claimService.openDocumentContent(claimId, documentId);
+        var object = content.storedObject();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(object.contentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + content.fileName() + "\"")
+                .contentLength(object.size())
+                .body(new InputStreamResource(object.stream()));
     }
 
     @PostMapping("/{claimId}/appeals")

@@ -14,6 +14,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +26,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import com.ingoboka_api.v1.document.model.DocumentContent;
 
 @RestController
 @RequestMapping("/api/v1/documents")
@@ -59,9 +64,22 @@ public class DocumentController {
 
     @GetMapping("/{documentId}/download-url")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Get presigned download URL (RBAC enforced)")
+    @Operation(summary = "Get download URL (presigned MinIO or API content proxy)")
     public ApiResponse<DownloadUrlResponse> downloadUrl(@PathVariable UUID documentId) {
         return ApiResponse.ok("Download URL generated", documentManagementService.getDownloadUrl(documentId));
+    }
+
+    @GetMapping("/{documentId}/content")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Stream document content (API proxy — no direct MinIO access needed)")
+    public ResponseEntity<InputStreamResource> streamContent(@PathVariable UUID documentId) {
+        DocumentContent content = documentManagementService.openDocumentContent(documentId);
+        var object = content.storedObject();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(object.contentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + content.fileName() + "\"")
+                .contentLength(object.size())
+                .body(new InputStreamResource(object.stream()));
     }
 
     @GetMapping

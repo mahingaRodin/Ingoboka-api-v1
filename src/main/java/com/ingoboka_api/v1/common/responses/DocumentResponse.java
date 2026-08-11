@@ -25,4 +25,6 @@ public class DocumentResponse {
     DocumentAccessClassification accessClassification;
     LocalDate retentionUntil;
     Instant createdAt;
+    /** Authenticated API proxy path when direct MinIO access is unavailable. */
+    String contentUrl;
 }
