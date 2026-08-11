@@ -11,6 +11,7 @@ import com.ingoboka_api.v1.claim.repositories.ClaimDecisionRepository;
 import com.ingoboka_api.v1.claim.repositories.ClaimDocumentRepository;
 import com.ingoboka_api.v1.claim.repositories.ClaimRepository;
 import com.ingoboka_api.v1.claim.repositories.ClaimStatusHistoryRepository;
+import com.ingoboka_api.v1.claim.events.ClaimSubmittedEvent;
 import com.ingoboka_api.v1.claim.services.ClaimService;
 import com.ingoboka_api.v1.common.enums.AppealStatus;
 import com.ingoboka_api.v1.common.enums.AuditOutcome;
@@ -61,6 +62,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,6 +100,7 @@ public class ClaimServiceImpl implements ClaimService {
     private final AuditComplianceService auditComplianceService;
     private final UserRepository userRepository;
     private final DocumentStorageService documentStorageService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -136,12 +139,8 @@ public class ClaimServiceImpl implements ClaimService {
         transitionStatus(claim, ClaimStatus.SUBMITTED, "Claim submitted by policyholder", null);
         claim.setUpdatedAt(Instant.now());
         claimRepository.save(claim);
-        notifyClaimholder(claim, "CLAIM_SUBMITTED", Map.of(
-                "claimNumber", claim.getClaimNumber(),
-                "decision", "SUBMITTED",
-                "notes", "Your claim is now under review."));
-        notifyInsurerStaffSubmitted(claim);
         auditComplianceService.log("CLAIM_SUBMITTED", "CLAIM", claim.getId(), "Claim submitted");
+        eventPublisher.publishEvent(new ClaimSubmittedEvent(claim.getId()));
         return toResponse(claim);
     }
 
