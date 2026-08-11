@@ -12,6 +12,7 @@ class MinioPropertiesTest {
         props.setEndpoint("http://minio:9000");
 
         assertThat(props.getEffectivePublicEndpoint()).isEqualTo("http://minio:9000");
+        assertThat(props.isPublicEndpointBrowserReachable()).isFalse();
     }
 
     @Test
@@ -21,6 +22,7 @@ class MinioPropertiesTest {
         props.setPublicEndpoint("http://20.1.2.3:9000");
 
         assertThat(props.getEffectivePublicEndpoint()).isEqualTo("http://20.1.2.3:9000");
+        assertThat(props.isPublicEndpointBrowserReachable()).isTrue();
     }
 
     @Test

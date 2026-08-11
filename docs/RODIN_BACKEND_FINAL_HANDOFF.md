@@ -13,7 +13,7 @@
 
 The **frontend MVP is integration-complete (~99%)**. All four portals (citizen, insurer, admin, agent), marketing site, enrollment, payments (sandbox + poll fallback), claims, dependants, KYC, profile, and **notifications inbox** are built and wired to your API clients.
 
-**Your backend is the remaining blocker for a flawless production demo (~72–78% ready).** The frontend already implements workarounds (path fallbacks, presigned upload flow, public catalog proxy, local SVG image fallbacks), but several routes still return **HTTP 500** or have **contract mismatches** on the live host `185.181.10.165:8085`.
+**Your backend is the remaining blocker for a flawless production demo (~72–78% ready).** The frontend already implements workarounds (path fallbacks, presigned upload flow, public catalog proxy, local SVG image fallbacks), but several routes still return **HTTP 500** or have **contract mismatches** on the live host `4.168.192.169:8085`.
 
 Arnold will integrate immediately after you merge fixes to `Ingoboka-api-v1` `main`. No frontend re-architecture is required — only backend compat routes, idempotency fixes, storage, and deploy hardening.
 
@@ -32,14 +32,14 @@ Arnold will integrate immediately after you merge fixes to `Ingoboka-api-v1` `ma
 Browser (HTTPS)
   → ingoboka-platform.vercel.app/api/v1/*
   → Next.js rewrite (next.config.js)
-  → http://185.181.10.165:8085/api/v1/*
+  → http://4.168.192.169:8085/api/v1/*
 ```
 
 **Vercel env (production):**
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=/api/v1
-API_PROXY_TARGET=http://185.181.10.165:8085
+API_PROXY_TARGET=http://4.168.192.169:8085
 ```
 
 This avoids mixed-content (HTTPS page → HTTP API). CORS is still required for any direct browser calls and for preflight from preview deployments.
@@ -205,7 +205,7 @@ POST /api/v1/claims/{id}/documents          (multipart)
 
 ## Endpoint contract table (frontend expectations)
 
-Base: `/api/v1`. Status on live host `185.181.10.165:8085` as of June 2026.
+Base: `/api/v1`. Status on live host `4.168.192.169:8085` as of June 2026.
 
 | Method | Path | Frontend module | Status | Notes |
 |--------|------|-----------------|--------|-------|
@@ -246,7 +246,7 @@ Full table in internal doc `docs/RODIN_BACKEND_REMAINING_WORK.md` (local, not in
 ## Smoke tests (run after deploy)
 
 ```bash
-HOST=http://185.181.10.165:8085
+HOST=http://4.168.192.169:8085
 
 # Health
 curl -s "$HOST/actuator/health/liveness"

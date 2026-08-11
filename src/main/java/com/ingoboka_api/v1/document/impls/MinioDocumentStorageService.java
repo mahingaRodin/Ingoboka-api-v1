@@ -3,7 +3,9 @@ package com.ingoboka_api.v1.document.impls;
 import com.ingoboka_api.v1.common.config.MinioProperties;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.document.services.DocumentStorageService;
+import com.ingoboka_api.v1.document.model.StoredObject;
 import io.minio.BucketExistsArgs;
+import io.minio.GetObjectArgs;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
@@ -11,6 +13,7 @@ import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
 import io.minio.StatObjectArgs;
 import io.minio.http.Method;
+import io.minio.StatObjectResponse;
 import jakarta.annotation.PostConstruct;
 import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
@@ -39,7 +42,11 @@ public class MinioDocumentStorageService implements DocumentStorageService {
         presignClient = publicEndpoint.equals(minioProperties.getEndpoint())
                 ? minioClient
                 : buildClient(publicEndpoint);
-        if (!publicEndpoint.equals(minioProperties.getEndpoint())) {
+        if (!minioProperties.isPublicEndpointBrowserReachable()) {
+            log.warn(
+                    "MinIO public endpoint {} is not browser-reachable — presigned document URLs may fail in the browser; profile pictures are served via the API proxy",
+                    publicEndpoint);
+        } else if (!publicEndpoint.equals(minioProperties.getEndpoint())) {
             log.info(
                     "MinIO presigned URLs will use public endpoint {} (internal: {})",
                     publicEndpoint,
@@ -93,6 +100,28 @@ public class MinioDocumentStorageService implements DocumentStorageService {
                     .build());
         } catch (Exception ex) {
             throw new BusinessException("Failed to generate download URL");
+        }
+    }
+
+    @Override
+    public StoredObject open(String objectKey) {
+        ensureClient();
+        try {
+            StatObjectResponse stat = minioClient.statObject(StatObjectArgs.builder()
+                    .bucket(minioProperties.getBucket())
+                    .object(objectKey)
+                    .build());
+            var response = minioClient.getObject(GetObjectArgs.builder()
+                    .bucket(minioProperties.getBucket())
+                    .object(objectKey)
+                    .build());
+            String contentType = stat.contentType();
+            if (contentType == null || contentType.isBlank()) {
+                contentType = "application/octet-stream";
+            }
+            return new StoredObject(response, contentType, stat.size());
+        } catch (Exception ex) {
+            throw new BusinessException("Failed to open document: " + ex.getMessage());
         }
     }
 

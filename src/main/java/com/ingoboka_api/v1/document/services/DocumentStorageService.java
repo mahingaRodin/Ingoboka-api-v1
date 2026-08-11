@@ -1,7 +1,7 @@
 package com.ingoboka_api.v1.document.services;
 
+import com.ingoboka_api.v1.document.model.StoredObject;
 import java.io.InputStream;
-import java.util.Map;
 
 public interface DocumentStorageService {
 
@@ -10,6 +10,8 @@ public interface DocumentStorageService {
     String presignedDownloadUrl(String objectKey);
 
     String presignedUploadUrl(String objectKey, String contentType);
+
+    StoredObject open(String objectKey);
 
     void delete(String objectKey);
 

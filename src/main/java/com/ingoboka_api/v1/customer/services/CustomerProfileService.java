@@ -6,8 +6,10 @@ import com.ingoboka_api.v1.common.requests.FrontendConsentRequest;
 import com.ingoboka_api.v1.common.requests.GrantConsentRequest;
 import com.ingoboka_api.v1.common.requests.ReviewKycRequest;
 import com.ingoboka_api.v1.common.requests.SaveNeedsAssessmentPreferencesRequest;
+import com.ingoboka_api.v1.common.requests.UpdateCitizenAccountRequest;
 import com.ingoboka_api.v1.common.requests.UpdateCitizenProfileRequest;
 import com.ingoboka_api.v1.common.requests.UpdateDependantRequest;
+import com.ingoboka_api.v1.common.responses.CitizenAccountResponse;
 import com.ingoboka_api.v1.common.responses.CitizenProfileResponse;
 import com.ingoboka_api.v1.common.responses.ConsentResponse;
 import com.ingoboka_api.v1.common.responses.DependantResponse;
@@ -22,6 +24,8 @@ public interface CustomerProfileService {
     CitizenProfileResponse getMyProfile();
 
     CitizenProfileResponse updateMyProfile(UpdateCitizenProfileRequest request);
+
+    CitizenAccountResponse updateMyAccount(UpdateCitizenAccountRequest request);
 
     PageResponse<DependantResponse> listMyDependants(int page, int size);
 

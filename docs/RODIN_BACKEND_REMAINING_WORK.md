@@ -14,7 +14,7 @@
 |-------|---|-------|
 | **Frontend** | **84%** | All four portals + marketing + enroll/claim flows are built and wired to API clients. Gaps: sandbox-only payment UX (no status polling), `customerApi.getMe()` discards API response, insurer `REQUEST_INFO` decision not mapped to backend, dependants/KYC pages exist but are thin. |
 | **Backend** | **68%** | Rodin's repo is a substantial modular monolith (~25 controllers, Flyway V1–V10, `FrontendCompatController`). Most MVP routes exist. Gaps: 5+ frontend path aliases missing, claim document upload contract mismatch (JSON vs multipart), consent idempotency bug in enrollment, no `/admin/platform/settings`, production MoMo/storage/CORS not hardened. |
-| **Integration** | **47%** | Vercel → Kamatera path is fragile: remote host (`185.181.10.165:8085`) has had unhealthy actuator/Swagger; CORS must whitelist Vercel; MinIO presigned URLs break `heroImageUrl`/product documents off-server; 11 frontend calls hit wrong path or wrong payload shape. End-to-end demo works locally with Docker Compose + seed data when env vars align. |
+| **Integration** | **47%** | Vercel → Kamatera path is fragile: remote host (`4.168.192.169:8085`) has had unhealthy actuator/Swagger; CORS must whitelist Vercel; MinIO presigned URLs break `heroImageUrl`/product documents off-server; 11 frontend calls hit wrong path or wrong payload shape. End-to-end demo works locally with Docker Compose + seed data when env vars align. |
 
 **MVP journey (concept doc §15.1) completion: ~52%** — register → consent → needs assessment → enroll → pay → policy → claim → insurer decision → appeal is coded on both sides but several hops fail on the deployed stack without fixes below.
 
@@ -85,7 +85,7 @@ Aligned with `Ingoboka_Enterprise_System_Concept_v1.pdf` §9.1–9.3 and §15.1 
 
 ### 6. Remote API health (Kamatera)
 
-Prior audits: `http://185.181.10.165:8085` — Swagger UI loads but `/v3/api-docs` returned 500, `/actuator/health` 503. Frontend shows network/generic errors across all portals until API is healthy.
+Prior audits: `http://4.168.192.169:8085` — Swagger UI loads but `/v3/api-docs` returned 500, `/actuator/health` 503. Frontend shows network/generic errors across all portals until API is healthy.
 
 **Fix checklist:** Postgres + Redis + MinIO up; `JWT_SECRET` set; `MAIL_HEALTH_ENABLED=false` if SMTP not configured; verify `GET /actuator/health/liveness` → 200; expose port 8085 (or reverse proxy TLS).
 
@@ -303,7 +303,7 @@ curl -s https://<host>:8085/api/v1/products?page=0&size=5
 
 ### Known remote issues
 
-- Documented demo host `185.181.10.165:8085` — partial failures on OpenAPI + health in prior audits; treat as deploy debt.
+- Documented demo host `4.168.192.169:8085` — partial failures on OpenAPI + health in prior audits; treat as deploy debt.
 - Presigned MinIO URLs use internal endpoint if misconfigured — browser on Vercel cannot fetch them; use external MinIO URL or API proxy download endpoint (`GET /documents/{id}/download-url`).
 
 ---

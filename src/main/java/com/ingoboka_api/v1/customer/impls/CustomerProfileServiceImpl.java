@@ -8,8 +8,10 @@ import com.ingoboka_api.v1.common.requests.FrontendConsentRequest;
 import com.ingoboka_api.v1.common.requests.GrantConsentRequest;
 import com.ingoboka_api.v1.common.requests.ReviewKycRequest;
 import com.ingoboka_api.v1.common.requests.SaveNeedsAssessmentPreferencesRequest;
+import com.ingoboka_api.v1.common.requests.UpdateCitizenAccountRequest;
 import com.ingoboka_api.v1.common.requests.UpdateCitizenProfileRequest;
 import com.ingoboka_api.v1.common.requests.UpdateDependantRequest;
+import com.ingoboka_api.v1.common.responses.CitizenAccountResponse;
 import com.ingoboka_api.v1.common.responses.CitizenProfileResponse;
 import com.ingoboka_api.v1.common.responses.ConsentResponse;
 import com.ingoboka_api.v1.common.responses.DependantResponse;
@@ -29,6 +31,8 @@ import com.ingoboka_api.v1.customer.repositories.DependantRepository;
 import com.ingoboka_api.v1.customer.services.CustomerProfileService;
 import com.ingoboka_api.v1.enrollment.services.NeedsAssessmentRecommendationService;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
+import com.ingoboka_api.v1.identity.models.User;
+import com.ingoboka_api.v1.identity.services.EmailReverificationService;
 import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -53,6 +57,7 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
     private final UserRepository userRepository;
     private final NotificationTemplateService notificationTemplateService;
     private final NeedsAssessmentRecommendationService needsAssessmentRecommendationService;
+    private final EmailReverificationService emailReverificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -99,6 +104,36 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
         }
         profile.setUpdatedAt(Instant.now());
         return toResponse(citizenProfileRepository.save(profile));
+    }
+
+    @Override
+    @Transactional
+    public CitizenAccountResponse updateMyAccount(UpdateCitizenAccountRequest request) {
+        IngobokaUserDetails current = SecurityUtils.currentUser();
+        User user = userRepository
+                .findWithDetailsById(current.getUserId())
+                .orElseThrow(() -> new BusinessException("User not found"));
+
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new BusinessException("Email is required");
+        }
+
+        boolean emailChanged = !request.getEmail().equalsIgnoreCase(user.getEmail());
+        if (emailChanged) {
+            emailReverificationService.applyEmailChange(user, request.getEmail());
+            user = userRepository
+                    .findWithDetailsById(user.getId())
+                    .orElseThrow(() -> new BusinessException("User not found"));
+        }
+
+        return CitizenAccountResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .phoneNumber(user.getPhoneNumber())
+                .status(user.getStatus().name())
+                .emailVerified(user.isEmailVerified())
+                .requiresEmailVerification(!user.isEmailVerified())
+                .build();
     }
 
     @Override

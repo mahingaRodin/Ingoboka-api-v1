@@ -103,7 +103,11 @@ class AuthControllerIntegrationTest extends IntegrationTestSupport {
         post("/api/v1/auth/login", """
                 {"identifier":"%s","password":"wrong-password"}
                 """.formatted(platformAdminEmail()))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("INVALID_PASSWORD"))
+                .andExpect(jsonPath("$.message").value("Password is incorrect"))
+                .andExpect(jsonPath("$.fieldErrors.password").value("Password is incorrect"));
     }
 
     @Test

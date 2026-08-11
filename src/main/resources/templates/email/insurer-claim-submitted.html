@@ -1,0 +1,56 @@
+Subject: New claim submitted — {{claimNumber}}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>New claim submitted</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f4f8;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f0f4f8;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #dce5eb;box-shadow:0 8px 32px rgba(11,58,110,0.10);">
+          <tr>
+            <td style="background:linear-gradient(135deg,#0B3A6E 0%,#072A52 100%);padding:32px 32px 0;text-align:center;">
+              <img src="{{logoUrl}}" alt="Ingoboka" width="168" height="50" style="display:inline-block;max-width:168px;height:auto;"/>
+            </td>
+          </tr>
+          <tr>
+            <td style="height:4px;background:#FDAA30;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#0B3A6E;font-weight:700;">New claim submitted</h1>
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#374151;">Hello {{fullName}},</p>
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#374151;">
+                A policyholder has submitted a new claim that requires your review.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 24px;width:100%;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;border-top:3px solid #FDAA30;">
+                <tr>
+                  <td style="padding:16px 20px;font-size:14px;line-height:1.8;color:#374151;">
+                    <p style="margin:0 0 6px;"><strong>Claim:</strong> {{claimNumber}}</p>
+                    <p style="margin:0 0 6px;"><strong>Policyholder:</strong> {{claimantName}}</p>
+                    <p style="margin:0 0 6px;"><strong>Policy:</strong> {{policyNumber}}</p>
+                    <p style="margin:0 0 6px;"><strong>Type:</strong> {{claimType}}</p>
+                    <p style="margin:0;"><strong>Amount:</strong> {{claimedAmount}} {{currency}}</p>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 24px;text-align:center;">
+                <a href="{{claimsUrl}}" style="display:inline-block;background:#0B3A6E;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 28px;border-radius:999px;">{{actionLabel}}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 28px;background:#f8fafc;border-top:1px solid #e5e7eb;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#6b7280;">© {{year}} Ingoboka · Digital microinsurance for Rwanda</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

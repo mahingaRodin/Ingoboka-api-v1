@@ -38,6 +38,7 @@ import com.ingoboka_api.v1.customer.models.CitizenProfile;
 import com.ingoboka_api.v1.customer.repositories.CitizenProfileRepository;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
+import com.ingoboka_api.v1.messaging.services.InsurerStaffNotificationService;
 import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
 import com.ingoboka_api.v1.policy.models.Policy;
 import com.ingoboka_api.v1.policy.repositories.PolicyRepository;
@@ -85,6 +86,7 @@ public class ClaimServiceImpl implements ClaimService {
     private final PolicyRepository policyRepository;
     private final CitizenProfileRepository citizenProfileRepository;
     private final NotificationTemplateService notificationTemplateService;
+    private final InsurerStaffNotificationService insurerStaffNotificationService;
     private final AuditComplianceService auditComplianceService;
     private final UserRepository userRepository;
 
@@ -129,6 +131,7 @@ public class ClaimServiceImpl implements ClaimService {
                 "claimNumber", claim.getClaimNumber(),
                 "decision", "SUBMITTED",
                 "notes", "Your claim is now under review."));
+        notifyInsurerStaffSubmitted(claim);
         auditComplianceService.log("CLAIM_SUBMITTED", "CLAIM", claim.getId(), "Claim submitted");
         return toResponse(claim);
     }
@@ -233,6 +236,7 @@ public class ClaimServiceImpl implements ClaimService {
         UUID actorId = SecurityUtils.currentUser().getUserId();
         transitionStatus(claim, ClaimStatus.SUBMITTED, "Created by insurer staff", actorId);
         claimRepository.save(claim);
+        notifyInsurerStaffSubmitted(claim);
         return toResponse(claim);
     }
 
@@ -281,6 +285,7 @@ public class ClaimServiceImpl implements ClaimService {
                 "claimNumber", claim.getClaimNumber(),
                 "status", request.getStatus().name(),
                 "notes", request.getReason() != null ? request.getReason() : ""));
+        notifyInsurerStaffStatusChange(claim, request.getStatus(), request.getReason());
         return toResponse(claim);
     }
 
@@ -329,6 +334,7 @@ public class ClaimServiceImpl implements ClaimService {
                 "claimNumber", claim.getClaimNumber(),
                 "decision", decisionLabel,
                 "notes", request.getReason() != null ? request.getReason() : ""));
+        notifyInsurerStaffDecision(claim, decisionLabel, request.getReason());
         if (request.getDecision() == ClaimDecisionType.APPROVED
                 || request.getDecision() == ClaimDecisionType.PARTIAL) {
             notifyClaimholder(claim, "PAYOUT_READY", Map.of(
@@ -532,6 +538,38 @@ public class ClaimServiceImpl implements ClaimService {
                         "CLAIM",
                         claim.getId())));
     }
+
+    private void notifyInsurerStaffSubmitted(Claim claim) {
+        ClaimContext ctx = resolveClaimContext(claim);
+        insurerStaffNotificationService.notifyClaimSubmitted(claim, ctx.claimantName(), ctx.policyNumber());
+    }
+
+    private void notifyInsurerStaffStatusChange(Claim claim, ClaimStatus status, String reason) {
+        ClaimContext ctx = resolveClaimContext(claim);
+        insurerStaffNotificationService.notifyClaimStatusChange(
+                claim, status, ctx.claimantName(), ctx.policyNumber(), reason);
+    }
+
+    private void notifyInsurerStaffDecision(Claim claim, String decisionLabel, String reason) {
+        ClaimContext ctx = resolveClaimContext(claim);
+        insurerStaffNotificationService.notifyClaimDecision(
+                claim, decisionLabel, ctx.claimantName(), ctx.policyNumber(), reason);
+    }
+
+    private ClaimContext resolveClaimContext(Claim claim) {
+        String policyNumber = policyRepository
+                .findById(claim.getPolicyId())
+                .map(Policy::getPolicyNumber)
+                .orElse("");
+        String claimantName = citizenProfileRepository
+                .findById(claim.getCitizenProfileId())
+                .flatMap(profile -> userRepository.findById(profile.getUserId()))
+                .map(user -> user.getFirstName() + " " + user.getLastName())
+                .orElse("Policyholder");
+        return new ClaimContext(claimantName, policyNumber);
+    }
+
+    private record ClaimContext(String claimantName, String policyNumber) {}
 
     private ClaimResponse toResponse(Claim claim) {
         Policy policy = policyRepository.findById(claim.getPolicyId()).orElse(null);

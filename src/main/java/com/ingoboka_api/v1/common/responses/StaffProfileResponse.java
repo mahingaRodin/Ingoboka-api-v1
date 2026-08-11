@@ -16,6 +16,7 @@ public class StaffProfileResponse {
     String lastName;
     String status;
     boolean emailVerified;
+    boolean requiresEmailVerification;
     Set<String> roles;
     UUID organizationId;
     String organizationName;

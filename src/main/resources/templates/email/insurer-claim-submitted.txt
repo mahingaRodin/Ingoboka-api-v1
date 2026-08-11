@@ -1,0 +1,15 @@
+Subject: New claim submitted — {{claimNumber}}
+
+Hello {{fullName}},
+
+A policyholder has submitted a new claim that requires your review.
+
+Claim: {{claimNumber}}
+Policyholder: {{claimantName}}
+Policy: {{policyNumber}}
+Type: {{claimType}}
+Amount: {{claimedAmount}} {{currency}}
+
+Review the claim in your insurer portal: {{claimsUrl}}
+
+— Ingoboka Platform

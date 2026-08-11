@@ -1,6 +1,5 @@
 package com.ingoboka_api.v1.identity.util;
 
-import com.ingoboka_api.v1.document.util.StorageUrlResolver;
 import com.ingoboka_api.v1.identity.models.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -9,12 +8,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class UserProfileMapper {
 
-    private final StorageUrlResolver storageUrlResolver;
+    private final ProfilePictureUrlBuilder profilePictureUrlBuilder;
 
     public String resolveProfilePictureUrl(User user) {
-        if (user == null || user.getProfilePictureKey() == null || user.getProfilePictureKey().isBlank()) {
-            return null;
-        }
-        return storageUrlResolver.resolveDownloadUrl(user.getProfilePictureKey());
+        return profilePictureUrlBuilder.resolveProfilePictureUrl(user);
     }
 }

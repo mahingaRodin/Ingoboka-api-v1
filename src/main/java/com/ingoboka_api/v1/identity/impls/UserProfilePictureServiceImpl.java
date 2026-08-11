@@ -5,6 +5,7 @@ import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.responses.ProfilePictureResponse;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.document.services.DocumentStorageService;
+import com.ingoboka_api.v1.identity.model.ProfilePictureContent;
 import com.ingoboka_api.v1.identity.models.User;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.identity.services.UserProfilePictureService;
@@ -96,6 +97,21 @@ public class UserProfilePictureServiceImpl implements UserProfilePictureService 
         auditComplianceService.log(
                 "PROFILE_PICTURE_REMOVED", "USER", user.getId(), "Profile picture removed");
         return ProfilePictureResponse.builder().profilePictureUrl(null).build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProfilePictureContent openMyProfilePictureContent() {
+        User user = requireCurrentUser();
+        String key = user.getProfilePictureKey();
+        if (!StringUtils.hasText(key)) {
+            return null;
+        }
+        String trimmed = key.trim();
+        if (isHttpUrl(trimmed)) {
+            return new ProfilePictureContent.ProfilePictureExternalRedirect(java.net.URI.create(trimmed));
+        }
+        return new ProfilePictureContent.ProfilePictureStoredObject(documentStorageService.open(trimmed));
     }
 
     @Override

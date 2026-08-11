@@ -6,6 +6,7 @@ import com.ingoboka_api.v1.common.requests.*;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.AuthTokensResponse;
 import com.ingoboka_api.v1.common.responses.OtpDeliveryConfigResponse;
+import com.ingoboka_api.v1.common.responses.PasswordResetTokenResponse;
 import com.ingoboka_api.v1.identity.services.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -73,15 +74,44 @@ public class AuthController {
         return ApiResponse.ok("Email verified successfully.", null);
     }
 
+    @PostMapping("/verify-email/otp")
+    @Operation(summary = "Confirm email verification with OTP", description = "For pending email after profile email change")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<AuthTokensResponse> confirmEmailOtp(@Valid @RequestBody VerifyEmailOtpRequest request) {
+        return ApiResponse.ok("Email verified successfully.", authService.confirmEmailOtp(request));
+    }
+
+    @PostMapping("/verify-email/resend-otp")
+    @Operation(summary = "Resend email verification OTP to pending address")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<Void> resendEmailVerificationOtp() {
+        authService.resendEmailVerificationOtp();
+        return ApiResponse.ok("If your account is pending verification, a new code has been sent.", null);
+    }
+
     @PostMapping("/forgot-password/request")
-    @Operation(summary = "Request password reset")
+    @Operation(summary = "Request password reset OTP", description = "Sends a 6-digit code to the account email")
     public ApiResponse<Void> requestPasswordReset(@Valid @RequestBody EmailRequest request) {
         authService.requestPasswordReset(request);
-        return ApiResponse.ok("If the account exists, a password reset email has been sent.", null);
+        return ApiResponse.ok("If the account exists, a password reset code has been sent.", null);
+    }
+
+    @PostMapping("/forgot-password/verify-otp")
+    @Operation(summary = "Verify password reset OTP", description = "Returns a short-lived token to set a new password")
+    public ApiResponse<PasswordResetTokenResponse> verifyPasswordResetOtp(
+            @Valid @RequestBody VerifyPasswordResetOtpRequest request) {
+        return ApiResponse.ok("Code verified.", authService.verifyPasswordResetOtp(request));
+    }
+
+    @PostMapping("/forgot-password/resend-otp")
+    @Operation(summary = "Resend password reset OTP")
+    public ApiResponse<Void> resendPasswordResetOtp(@Valid @RequestBody EmailRequest request) {
+        authService.resendPasswordResetOtp(request);
+        return ApiResponse.ok("If the account exists, a new password reset code has been sent.", null);
     }
 
     @PostMapping("/forgot-password/reset")
-    @Operation(summary = "Reset password")
+    @Operation(summary = "Reset password", description = "Requires reset token from OTP verification")
     public ApiResponse<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
         authService.resetPassword(request);
         return ApiResponse.ok("Password reset successful.", null);

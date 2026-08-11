@@ -4,9 +4,11 @@ import com.ingoboka_api.v1.common.enums.ConsentType;
 import com.ingoboka_api.v1.common.requests.CreateDependantRequest;
 import com.ingoboka_api.v1.common.requests.GrantConsentRequest;
 import com.ingoboka_api.v1.common.requests.SaveNeedsAssessmentPreferencesRequest;
+import com.ingoboka_api.v1.common.requests.UpdateCitizenAccountRequest;
 import com.ingoboka_api.v1.common.requests.UpdateCitizenProfileRequest;
 import com.ingoboka_api.v1.common.requests.UpdateDependantRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
+import com.ingoboka_api.v1.common.responses.CitizenAccountResponse;
 import com.ingoboka_api.v1.common.responses.CitizenProfileResponse;
 import com.ingoboka_api.v1.common.responses.ConsentResponse;
 import com.ingoboka_api.v1.common.responses.DependantResponse;
@@ -55,6 +57,17 @@ public class CustomerProfileController {
     public ApiResponse<CitizenProfileResponse> updateMyProfile(
             @Valid @RequestBody UpdateCitizenProfileRequest request) {
         return ApiResponse.ok("Profile saved", customerProfileService.updateMyProfile(request));
+    }
+
+    @PutMapping("/account")
+    @PreAuthorize("hasRole('CITIZEN')")
+    @Operation(summary = "Update my account email", description = "Changing email requires re-verification before portal access is restored")
+    public ApiResponse<CitizenAccountResponse> updateMyAccount(@Valid @RequestBody UpdateCitizenAccountRequest request) {
+        CitizenAccountResponse account = customerProfileService.updateMyAccount(request);
+        String message = account.isRequiresEmailVerification()
+                ? "Email updated — verify your new address to restore access"
+                : "Account updated";
+        return ApiResponse.ok(message, account);
     }
 
     @GetMapping("/dependants")

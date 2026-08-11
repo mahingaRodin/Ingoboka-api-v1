@@ -15,6 +15,9 @@ public interface InsuranceProductRepository extends JpaRepository<InsuranceProdu
 
     Page<InsuranceProduct> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId, Pageable pageable);
 
+    Page<InsuranceProduct> findByOrganizationIdAndStatusOrderByCreatedAtDesc(
+            UUID organizationId, ProductStatus status, Pageable pageable);
+
     List<InsuranceProduct> findByStatusOrderByPublishedAtDesc(ProductStatus status);
 
     Page<InsuranceProduct> findByStatusOrderByPublishedAtDesc(ProductStatus status, Pageable pageable);

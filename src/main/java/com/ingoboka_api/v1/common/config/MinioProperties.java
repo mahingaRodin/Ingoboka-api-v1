@@ -29,4 +29,17 @@ public class MinioProperties {
         }
         return endpoint;
     }
+
+    /** True when presigned URLs can be opened directly in a browser (not Docker-internal hostnames). */
+    public boolean isPublicEndpointBrowserReachable() {
+        String effective = getEffectivePublicEndpoint();
+        if (effective == null || effective.isBlank()) {
+            return false;
+        }
+        String lower = effective.toLowerCase();
+        return !lower.contains("://minio:")
+                && !lower.contains("://minio/")
+                && !lower.startsWith("http://minio")
+                && !lower.startsWith("https://minio");
+    }
 }

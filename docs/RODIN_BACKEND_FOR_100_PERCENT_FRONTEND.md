@@ -100,7 +100,7 @@ The Next.js frontend (`frontend/`) is **~93% built against design**. Most screen
 
 ### 3.3 Email OTP for production / remote demo
 
-**Problem:** SMS is not enabled (`frontend-auth-without-sms.md`). Deployed API (`185.181.10.165:8085`) must send OTP email reliably.
+**Problem:** SMS is not enabled (`frontend-auth-without-sms.md`). Deployed API (`4.168.192.169:8085`) must send OTP email reliably.
 
 **Action:**
 

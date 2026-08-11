@@ -9,6 +9,7 @@ import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.identity.models.Role;
 import com.ingoboka_api.v1.identity.models.User;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
+import com.ingoboka_api.v1.identity.services.EmailReverificationService;
 import com.ingoboka_api.v1.identity.services.UserProfilePictureService;
 import com.ingoboka_api.v1.identity.util.UserProfileMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +38,7 @@ public class StaffProfileController {
     private final AuditComplianceService auditComplianceService;
     private final UserProfileMapper userProfileMapper;
     private final UserProfilePictureService userProfilePictureService;
+    private final EmailReverificationService emailReverificationService;
 
     @GetMapping("/me")
     @PreAuthorize(
@@ -54,6 +56,7 @@ public class StaffProfileController {
     @Operation(summary = "Update my staff profile")
     public ApiResponse<StaffProfileResponse> updateMyProfile(@Valid @RequestBody UpdateStaffProfileRequest request) {
         User user = requireCurrentStaff();
+        boolean emailChanged = false;
 
         if (StringUtils.hasText(request.getFirstName())) {
             user.setFirstName(request.getFirstName().trim());
@@ -63,11 +66,8 @@ public class StaffProfileController {
         }
         if (StringUtils.hasText(request.getEmail())
                 && !request.getEmail().equalsIgnoreCase(user.getEmail())) {
-            if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
-                throw new BusinessException("Email is already registered");
-            }
-            user.setEmail(request.getEmail().trim().toLowerCase());
-            user.setEmailVerified(false);
+            emailReverificationService.applyEmailChange(user, request.getEmail());
+            emailChanged = true;
         }
         if (request.getPhoneNumber() != null) {
             user.setPhoneNumber(request.getPhoneNumber());
@@ -75,11 +75,19 @@ public class StaffProfileController {
         if (StringUtils.hasText(request.getProfilePictureUrl())) {
             userProfilePictureService.applyProfilePictureUrl(user.getId(), request.getProfilePictureUrl());
         }
-        user.setUpdatedAt(Instant.now());
-        userRepository.save(user);
+        if (!emailChanged) {
+            user.setUpdatedAt(Instant.now());
+            userRepository.save(user);
+        } else {
+            user = userRepository
+                    .findWithDetailsById(user.getId())
+                    .orElseThrow(() -> new BusinessException("User not found"));
+        }
 
         auditComplianceService.log("STAFF_PROFILE_UPDATED", "USER", user.getId(), "Updated staff profile");
-        return ApiResponse.ok("Profile updated", toResponse(requireCurrentStaff()));
+        return ApiResponse.ok(
+                emailChanged ? "Email updated — verify your new address to restore access" : "Profile updated",
+                toResponse(user));
     }
 
     private User requireCurrentStaff() {
@@ -97,6 +105,7 @@ public class StaffProfileController {
                 .lastName(user.getLastName())
                 .status(user.getStatus().name())
                 .emailVerified(user.isEmailVerified())
+                .requiresEmailVerification(!user.isEmailVerified())
                 .roles(user.getRoles().stream().map(Role::getCode).collect(Collectors.toSet()))
                 .organizationId(user.getOrganization() != null ? user.getOrganization().getId() : null)
                 .organizationName(user.getOrganization() != null ? user.getOrganization().getName() : null)

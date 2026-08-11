@@ -7,7 +7,7 @@ Built with **Java 21**, **Spring Boot 4**, **PostgreSQL**, **Redis**, and **MinI
 | | |
 |---|---|
 | **Base URL (local Docker)** | `http://localhost:8085/api/v1` |
-| **Base URL (remote demo)** | `http://185.181.10.165:8085/api/v1` |
+| **Base URL (remote demo)** | `http://4.168.192.169:8085/api/v1` |
 | **Swagger UI (Docker)** | `http://localhost:8085/swagger-ui/index.html` |
 | **Health** | `GET /actuator/health` |
 
