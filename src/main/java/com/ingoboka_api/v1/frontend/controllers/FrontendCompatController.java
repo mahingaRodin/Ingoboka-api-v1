@@ -24,17 +24,12 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import com.ingoboka_api.v1.audit.services.AuditComplianceService;
-import com.ingoboka_api.v1.document.services.DocumentStorageService;
 import com.ingoboka_api.v1.common.exception.BusinessException;
-import com.ingoboka_api.v1.common.util.HashUtils;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-import java.io.ByteArrayInputStream;
 
 @RestController
 @RequiredArgsConstructor
@@ -53,7 +48,6 @@ public class FrontendCompatController {
     private final PolicyApplicationRepository policyApplicationRepository;
     private final ClaimRepository claimRepository;
     private final AuditComplianceService auditComplianceService;
-    private final DocumentStorageService documentStorageService;
 
     @GetMapping("/api/v1/customers/me")
     @PreAuthorize("hasRole('CITIZEN')")
@@ -373,36 +367,5 @@ public class FrontendCompatController {
         reviewReq.setStatus(status);
         reviewReq.setDecisionReason(payload.get("reason"));
         return ApiResponse.ok("Application reviewed", enrollmentService.reviewApplication(applicationId, reviewReq));
-    }
-
-    @PostMapping(value = "/api/v1/claims/{claimId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('CITIZEN', 'CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR')")
-    @Operation(summary = "Upload claim documents (multipart)")
-    @SecurityRequirement(name = "bearerAuth")
-    public ApiResponse<Void> uploadClaimDocuments(
-            @PathVariable UUID claimId, 
-            @RequestPart("files") MultipartFile[] files) {
-        for (MultipartFile file : files) {
-            try {
-                String objectKey = "claims/" + claimId + "/" + UUID.randomUUID() + "-" + file.getOriginalFilename();
-                String contentType = file.getContentType();
-                long size = file.getSize();
-                byte[] bytes = file.getBytes();
-                String checksum = HashUtils.sha256(bytes);
-                documentStorageService.upload(objectKey, new ByteArrayInputStream(bytes), size, contentType);
-                
-                AttachClaimDocumentRequest attachReq = new AttachClaimDocumentRequest();
-                attachReq.setDocumentType("SUPPORTING_DOCUMENT");
-                attachReq.setObjectKey(objectKey);
-                attachReq.setMimeType(contentType);
-                attachReq.setSizeBytes(size);
-                attachReq.setChecksum(checksum != null ? checksum : "unknown");
-                claimService.attachDocument(claimId, attachReq);
-            } catch (Exception e) {
-                throw new com.ingoboka_api.v1.common.exception.BusinessException("File upload failed: " + e.getMessage());
-            }
-        }
-        return ApiResponse.ok("Documents uploaded", null);
     }
 }
