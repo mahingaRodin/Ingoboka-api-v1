@@ -103,6 +103,12 @@ public class NotificationServiceImpl implements NotificationService {
                 email, "otp-verification", Map.of("otp", otp, "minutes", String.valueOf(expirationMinutes)));
     }
 
+    @Override
+    public void sendPasswordResetOtpEmail(String email, String otp, int expirationMinutes) {
+        sendTemplatedEmail(
+                email, "password-reset-otp", Map.of("otp", otp, "minutes", String.valueOf(expirationMinutes)));
+    }
+
     private void sendMultipartEmail(
             String email, String subject, String htmlBody, String textBody, String context, String devToken) {
         try {

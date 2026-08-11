@@ -1,7 +1,10 @@
 package com.ingoboka_api.v1.product.services;
 
+import com.ingoboka_api.v1.common.enums.ProductStatus;
 import com.ingoboka_api.v1.common.requests.CreateProductPlanRequest;
 import com.ingoboka_api.v1.common.requests.CreateProductRequest;
+import com.ingoboka_api.v1.common.requests.UnpublishProductRequest;
+import com.ingoboka_api.v1.common.requests.UpdateProductRequest;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.ProductDetailResponse;
 import com.ingoboka_api.v1.common.responses.ProductPlanResponse;
@@ -15,7 +18,11 @@ public interface ProductCatalogService {
 
     ProductResponse publishProduct(UUID productId);
 
-    PageResponse<ProductResponse> listTenantProducts(int page, int size);
+    ProductResponse updateProduct(UUID productId, UpdateProductRequest request);
+
+    ProductResponse unpublishProduct(UUID productId, UnpublishProductRequest request);
+
+    PageResponse<ProductResponse> listTenantProducts(ProductStatus status, int page, int size);
 
     PageResponse<ProductResponse> listPublishedProducts(int page, int size);
 

@@ -14,6 +14,7 @@ import com.ingoboka_api.v1.common.enums.VerificationTokenType;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.*;
 import com.ingoboka_api.v1.common.responses.AuthTokensResponse;
+import com.ingoboka_api.v1.common.responses.PasswordResetTokenResponse;
 import com.ingoboka_api.v1.common.security.IngobokaUserDetails;
 import com.ingoboka_api.v1.common.security.JwtService;
 import com.ingoboka_api.v1.common.util.HashUtils;
@@ -26,6 +27,7 @@ import com.ingoboka_api.v1.identity.repositories.RoleRepository;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
 import com.ingoboka_api.v1.identity.repositories.VerificationTokenRepository;
 import com.ingoboka_api.v1.identity.services.AuthService;
+import com.ingoboka_api.v1.identity.services.EmailReverificationService;
 import com.ingoboka_api.v1.identity.services.NotificationService;
 import com.ingoboka_api.v1.identity.services.OtpService;
 import com.ingoboka_api.v1.identity.services.UserProfilePictureService;
@@ -42,9 +44,6 @@ import com.ingoboka_api.v1.platform.services.PlatformSettingsService;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,7 +69,6 @@ public class AuthServiceImpl implements AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final VerificationTokenRepository verificationTokenRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
     private final SecurityProperties securityProperties;
@@ -85,8 +83,10 @@ public class AuthServiceImpl implements AuthService {
     private final PlatformSettingsService platformSettingsService;
     private final UserProfilePictureService userProfilePictureService;
     private final UserProfileMapper userProfileMapper;
+    private final EmailReverificationService emailReverificationService;
 
     private static final String OTP_PURPOSE_SIGNUP = "SIGNUP";
+    private static final String OTP_PURPOSE_PASSWORD_RESET = "PASSWORD_RESET";
     private static final String SYNTHETIC_EMAIL_DOMAIN = "@phone.ingoboka.rw";
 
     @Value("${ingoboka.security.otp.expiration-minutes:10}")
@@ -241,12 +241,8 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthTokensResponse login(LoginRequest request) {
         String identifier = request.resolvedIdentifier();
-        String principal =
-                PhoneNumberUtils.looksLikeEmail(identifier) ? identifier.toLowerCase() : identifier;
-        try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(principal, request.getPassword()));
-        } catch (AuthenticationException ex) {
+        Optional<User> userOpt = findUserByLoginIdentifier(identifier);
+        if (userOpt.isEmpty()) {
             auditComplianceService.logSystem(
                     AuditOutcome.FAILED,
                     "USER_LOGIN_FAILED",
@@ -254,20 +250,18 @@ public class AuthServiceImpl implements AuthService {
                     null,
                     "Invalid credentials for " + maskLoginIdentifier(identifier),
                     maskLoginIdentifier(identifier));
-            throw ex;
+            throw new BusinessException("Invalid credentials", "INVALID_CREDENTIALS");
         }
 
-        User user = findUserByLoginIdentifier(identifier)
-                .orElseThrow(() -> {
-                    auditComplianceService.logSystem(
-                            AuditOutcome.FAILED,
-                            "USER_LOGIN_FAILED",
-                            "USER",
-                            null,
-                            "Invalid credentials for " + maskLoginIdentifier(identifier),
-                            maskLoginIdentifier(identifier));
-                    return new BusinessException("Invalid credentials");
-                });
+        User user = userOpt.get();
+        if (user.getPasswordHash() == null
+                || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            auditLoginFailure(user, "Invalid password");
+            throw new BusinessException(
+                    "Password is incorrect",
+                    "INVALID_PASSWORD",
+                    Map.of("password", "Password is incorrect"));
+        }
 
         boolean isCitizen = user.getRoles().stream().anyMatch(role -> RoleCodes.CITIZEN.equals(role.getCode()));
 
@@ -320,6 +314,43 @@ public class AuthServiceImpl implements AuthService {
         user.setUpdatedAt(Instant.now());
         consumeToken(token);
         userRepository.save(user);
+        otpService.clear(EmailReverificationServiceImpl.OTP_PURPOSE_EMAIL_CHANGE, user.getEmail());
+    }
+
+    @Override
+    @Transactional
+    public AuthTokensResponse confirmEmailOtp(VerifyEmailOtpRequest request) {
+        User user = userRepository
+                .findWithDetailsById(SecurityUtils.currentUser().getUserId())
+                .orElseThrow(() -> new BusinessException("User not found"));
+        if (user.isEmailVerified() && user.getStatus() == UserStatus.ACTIVE) {
+            return buildAuthResponse(user);
+        }
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            throw new BusinessException("No email address on file");
+        }
+        otpService.verify(
+                EmailReverificationServiceImpl.OTP_PURPOSE_EMAIL_CHANGE,
+                user.getEmail(),
+                request.getCode());
+        user.setEmailVerified(true);
+        user.setStatus(UserStatus.ACTIVE);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+        auditComplianceService.log("EMAIL_VERIFIED", "USER", user.getId(), "Email verified via OTP");
+        return buildAuthResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public void resendEmailVerificationOtp() {
+        User user = userRepository
+                .findWithDetailsById(SecurityUtils.currentUser().getUserId())
+                .orElseThrow(() -> new BusinessException("User not found"));
+        if (user.isEmailVerified() && user.getStatus() == UserStatus.ACTIVE) {
+            return;
+        }
+        emailReverificationService.sendEmailVerificationOtp(user);
     }
 
     @Override
@@ -402,11 +433,36 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void requestPasswordReset(EmailRequest request) {
-        userRepository.findByEmailIgnoreCase(request.getEmail()).ifPresent(user -> {
-            if (user.getStatus() == UserStatus.ACTIVE) {
-                issueVerificationToken(user, VerificationTokenType.PASSWORD_RESET);
+        String email = request.getEmail().trim().toLowerCase();
+        userRepository.findByEmailIgnoreCase(email).ifPresent(user -> {
+            if (user.getStatus() == UserStatus.ACTIVE && hasRealEmail(email)) {
+                sendPasswordResetOtp(email);
             }
         });
+    }
+
+    @Override
+    @Transactional
+    public PasswordResetTokenResponse verifyPasswordResetOtp(VerifyPasswordResetOtpRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+        User user = userRepository
+                .findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new BusinessException("Invalid or expired code"));
+
+        if (user.getStatus() != UserStatus.ACTIVE || !hasRealEmail(email)) {
+            throw new BusinessException("Invalid or expired code");
+        }
+
+        otpService.verify(OTP_PURPOSE_PASSWORD_RESET, email, request.getOtp());
+        otpService.clear(OTP_PURPOSE_PASSWORD_RESET, email);
+        String resetToken = issuePasswordResetToken(user);
+        return PasswordResetTokenResponse.builder().resetToken(resetToken).build();
+    }
+
+    @Override
+    @Transactional
+    public void resendPasswordResetOtp(EmailRequest request) {
+        requestPasswordReset(request);
     }
 
     @Override
@@ -418,6 +474,13 @@ public class AuthServiceImpl implements AuthService {
         user.setUpdatedAt(Instant.now());
         consumeToken(token);
         userRepository.save(user);
+        refreshTokenRepository.revokeAllForUser(user);
+        notificationService.sendTemplatedEmail(
+                user.getEmail(),
+                "password-changed",
+                Map.of("fullName", user.getFirstName() + " " + user.getLastName()));
+        auditComplianceService.log(
+                "PASSWORD_RESET", "USER", user.getId(), "Password reset via forgot-password flow");
     }
 
     @Override
@@ -468,6 +531,7 @@ public class AuthServiceImpl implements AuthService {
                 "password-changed",
                 Map.of("fullName", user.getFirstName() + " " + user.getLastName()));
         issueVerificationToken(user, VerificationTokenType.EMAIL_VERIFICATION);
+        emailReverificationService.sendEmailVerificationOtp(user);
 
         auditComplianceService.log("PASSWORD_CHANGED", "USER", user.getId(), "Password changed successfully");
         return buildAuthResponse(user);
@@ -579,6 +643,28 @@ public class AuthServiceImpl implements AuthService {
         refreshToken.setExpiresAt(Instant.now().plusSeconds(jwtProperties.getRefreshTokenExpirationDays() * 86400L));
         refreshToken.setCreatedAt(Instant.now());
         refreshTokenRepository.save(refreshToken);
+        return rawToken;
+    }
+
+    private void sendPasswordResetOtp(String email) {
+        String otp = otpService.generateAndStore(OTP_PURPOSE_PASSWORD_RESET, email);
+        notificationService.sendPasswordResetOtpEmail(email, otp, otpExpirationMinutes);
+    }
+
+    private boolean hasRealEmail(String email) {
+        return StringUtils.hasText(email) && !email.endsWith(SYNTHETIC_EMAIL_DOMAIN);
+    }
+
+    private String issuePasswordResetToken(User user) {
+        String rawToken = UUID.randomUUID().toString();
+        VerificationToken token = new VerificationToken();
+        token.setId(UUID.randomUUID());
+        token.setUser(user);
+        token.setTokenHash(hashToken(rawToken));
+        token.setType(VerificationTokenType.PASSWORD_RESET);
+        token.setExpiresAt(Instant.now().plusSeconds(expirationHours(VerificationTokenType.PASSWORD_RESET) * 3600L));
+        token.setCreatedAt(Instant.now());
+        verificationTokenRepository.save(token);
         return rawToken;
     }
 

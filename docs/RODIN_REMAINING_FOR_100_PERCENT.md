@@ -3,7 +3,7 @@
 **Date:** 20 June 2026  
 **Audience:** Rodin Mahinga  
 **Frontend status:** ~98% — all design screens built; API clients wired to your latest endpoints on remote  
-**Canonical latest code:** `Ingoboka-api-v1/` (verified on `http://185.181.10.165:8085/api/v1`)  
+**Canonical latest code:** `Ingoboka-api-v1/` (verified on `http://4.168.192.169:8085/api/v1`)  
 **Deploy path in platform repo:** `backend/` — **currently stale** vs `Ingoboka-api-v1/` (missing product detail, claims-breakdown, policy enrichment, etc.)
 
 **Full history / context:** `docs/RODIN_BACKEND_FOR_100_PERCENT_FRONTEND.md`

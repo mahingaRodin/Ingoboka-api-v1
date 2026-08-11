@@ -28,6 +28,7 @@ import com.ingoboka_api.v1.identity.models.Role;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.identity.models.User;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
+import com.ingoboka_api.v1.messaging.services.InsurerStaffNotificationService;
 import com.ingoboka_api.v1.messaging.services.NotificationTemplateService;
 import com.ingoboka_api.v1.policy.repositories.PolicyRepository;
 import java.util.Optional;
@@ -69,6 +70,9 @@ class ClaimServiceValidationTest {
 
     @Mock
     private NotificationTemplateService notificationTemplateService;
+
+    @Mock
+    private InsurerStaffNotificationService insurerStaffNotificationService;
 
     @Mock
     private AuditComplianceService auditComplianceService;

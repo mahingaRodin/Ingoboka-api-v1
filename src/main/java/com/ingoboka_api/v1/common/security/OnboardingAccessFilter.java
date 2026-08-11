@@ -1,7 +1,6 @@
 package com.ingoboka_api.v1.common.security;
 
 import com.ingoboka_api.v1.common.enums.UserStatus;
-import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.identity.models.RoleCodes;
 import com.ingoboka_api.v1.identity.models.User;
 import com.ingoboka_api.v1.identity.repositories.UserRepository;
@@ -29,6 +28,8 @@ public class OnboardingAccessFilter extends OncePerRequestFilter {
     private static final Set<String> EMAIL_VERIFICATION_ALLOWED_PREFIXES = Set.of(
             "/api/v1/auth/verify-email/request",
             "/api/v1/auth/verify-email/confirm",
+            "/api/v1/auth/verify-email/otp",
+            "/api/v1/auth/verify-email/resend-otp",
             "/api/v1/auth/logout",
             "/api/v1/auth/refresh");
 
@@ -41,19 +42,29 @@ public class OnboardingAccessFilter extends OncePerRequestFilter {
             User user = userRepository
                     .findWithDetailsById(SecurityUtils.currentUser().getUserId())
                     .orElse(null);
-            if (user != null && isStaff(user)) {
+            if (user != null) {
                 String path = request.getRequestURI();
-                if (user.isMustChangePassword() || user.getStatus() == UserStatus.PENDING_PASSWORD_CHANGE) {
-                    if (!isAllowed(path, PASSWORD_CHANGE_ALLOWED_PREFIXES)) {
-                        writeBlocked(response, "MUST_CHANGE_PASSWORD", "You must change your temporary password first");
-                        return;
+                if (isStaff(user)) {
+                    if (user.isMustChangePassword() || user.getStatus() == UserStatus.PENDING_PASSWORD_CHANGE) {
+                        if (!isAllowed(path, PASSWORD_CHANGE_ALLOWED_PREFIXES)) {
+                            writeBlocked(response, "MUST_CHANGE_PASSWORD", "You must change your temporary password first");
+                            return;
+                        }
+                    } else if (!user.isEmailVerified() || user.getStatus() == UserStatus.PENDING_EMAIL_VERIFICATION) {
+                        if (!isAllowed(path, EMAIL_VERIFICATION_ALLOWED_PREFIXES)) {
+                            writeBlocked(
+                                    response,
+                                    "EMAIL_VERIFICATION_REQUIRED",
+                                    "Verify your email address to restore access");
+                            return;
+                        }
                     }
-                } else if (!user.isEmailVerified() || user.getStatus() == UserStatus.PENDING_EMAIL_VERIFICATION) {
+                } else if (isCitizen(user) && requiresCitizenEmailVerification(user)) {
                     if (!isAllowed(path, EMAIL_VERIFICATION_ALLOWED_PREFIXES)) {
                         writeBlocked(
                                 response,
                                 "EMAIL_VERIFICATION_REQUIRED",
-                                "Verify your email address to activate your account");
+                                "Verify your new email address to restore access");
                         return;
                     }
                 }
@@ -66,6 +77,16 @@ public class OnboardingAccessFilter extends OncePerRequestFilter {
         return user.getRoles().stream()
                 .noneMatch(role -> RoleCodes.CITIZEN.equals(role.getCode())
                         || RoleCodes.BENEFICIARY.equals(role.getCode()));
+    }
+
+    private boolean isCitizen(User user) {
+        return user.getRoles().stream().anyMatch(role -> RoleCodes.CITIZEN.equals(role.getCode()));
+    }
+
+    /** Citizens who finished phone signup but changed email and must re-verify. */
+    private boolean requiresCitizenEmailVerification(User user) {
+        return user.isPhoneVerified()
+                && (!user.isEmailVerified() || user.getStatus() == UserStatus.PENDING_EMAIL_VERIFICATION);
     }
 
     private boolean isAllowed(String path, Set<String> allowedPrefixes) {

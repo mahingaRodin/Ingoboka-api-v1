@@ -6,7 +6,8 @@ import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.security.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
-import java.util.stream.Collectors;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import com.ingoboka_api.v1.platform.services.PlatformSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,15 +36,25 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
-        return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage()));
+        Map<String, String> fieldErrors =
+                ex.getFieldErrors().isEmpty() ? null : ex.getFieldErrors();
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(ex.getMessage(), ex.getCode(), fieldErrors));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult().getFieldErrors().stream()
-                .map(FieldError::getDefaultMessage)
-                .collect(Collectors.joining("; "));
-        return ResponseEntity.badRequest().body(ApiResponse.error(message));
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(error -> {
+            if (error.getDefaultMessage() != null) {
+                fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage());
+            }
+        });
+        String message = fieldErrors.isEmpty()
+                ? "Validation failed"
+                : String.join("; ", fieldErrors.values());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(message, "VALIDATION_ERROR", fieldErrors.isEmpty() ? null : fieldErrors));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

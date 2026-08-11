@@ -48,6 +48,6 @@ public class InsurerDashboardController {
     @Operation(summary = "List tenant products (insurer alias)")
     public ApiResponse<PageResponse<ProductResponse>> tenantProducts(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("Products retrieved", productCatalogService.listTenantProducts(page, size));
+        return ApiResponse.ok("Products retrieved", productCatalogService.listTenantProducts(null, page, size));
     }
 }

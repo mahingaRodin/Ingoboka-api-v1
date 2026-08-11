@@ -5,6 +5,8 @@ import com.ingoboka_api.v1.common.enums.ProductStatus;
 import com.ingoboka_api.v1.common.exception.BusinessException;
 import com.ingoboka_api.v1.common.requests.CreateProductPlanRequest;
 import com.ingoboka_api.v1.common.requests.CreateProductRequest;
+import com.ingoboka_api.v1.common.requests.UnpublishProductRequest;
+import com.ingoboka_api.v1.common.requests.UpdateProductRequest;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.ProductDetailResponse;
 import com.ingoboka_api.v1.common.responses.ProductPlanResponse;
@@ -104,11 +106,57 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
     }
 
     @Override
+    @Transactional
+    public ProductResponse updateProduct(UUID productId, UpdateProductRequest request) {
+        InsuranceProduct product = requireTenantProduct(productId);
+        assertCanManageProducts(product.getOrganizationId());
+        if (product.getStatus() != ProductStatus.DRAFT) {
+            throw new BusinessException("Only draft products can be updated. Unpublish first if needed.");
+        }
+        product.setName(request.getName());
+        product.setDescription(request.getDescription());
+        product.setCategory(request.getCategory());
+        if (request.getHeroImageUrl() != null) {
+            product.setHeroImageKey(
+                    request.getHeroImageUrl().isBlank() ? null : request.getHeroImageUrl().trim());
+        }
+        product.setUpdatedAt(Instant.now());
+        return toProductResponse(productRepository.save(product));
+    }
+
+    @Override
+    @Transactional
+    public ProductResponse unpublishProduct(UUID productId, UnpublishProductRequest request) {
+        InsuranceProduct product = requireTenantProduct(productId);
+        assertCanManageProducts(product.getOrganizationId());
+        if (product.getStatus() != ProductStatus.PUBLISHED) {
+            throw new BusinessException("Only published products can be unpublished");
+        }
+        ProductStatus target = request != null && request.isArchive() ? ProductStatus.ARCHIVED : ProductStatus.DRAFT;
+        product.setStatus(target);
+        product.setPublishedAt(null);
+        product.setUpdatedAt(Instant.now());
+        if (target == ProductStatus.DRAFT) {
+            planRepository.findByProductIdOrderByCreatedAtAsc(productId).forEach(plan -> {
+                if (plan.getStatus() == ProductStatus.PUBLISHED) {
+                    plan.setStatus(ProductStatus.DRAFT);
+                    plan.setUpdatedAt(Instant.now());
+                    planRepository.save(plan);
+                }
+            });
+        }
+        return toProductResponse(productRepository.save(product));
+    }
+
+    @Override
     @Transactional(readOnly = true)
-    public PageResponse<ProductResponse> listTenantProducts(int page, int size) {
+    public PageResponse<ProductResponse> listTenantProducts(ProductStatus status, int page, int size) {
         UUID orgId = requireTenantOrganizationIdForRead();
-        Page<InsuranceProduct> result = productRepository.findByOrganizationIdOrderByCreatedAtDesc(
-                orgId, PaginationUtils.toPageable(page, size));
+        Page<InsuranceProduct> result = status != null
+                ? productRepository.findByOrganizationIdAndStatusOrderByCreatedAtDesc(
+                        orgId, status, PaginationUtils.toPageable(page, size))
+                : productRepository.findByOrganizationIdOrderByCreatedAtDesc(
+                        orgId, PaginationUtils.toPageable(page, size));
         return PageResponse.from(result.map(this::toProductResponse));
     }
 
@@ -395,9 +443,16 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
     }
 
     private InsuranceProduct requireTenantProduct(UUID productId) {
-        return productRepository
+        InsuranceProduct product = productRepository
                 .findById(productId)
                 .orElseThrow(() -> new BusinessException("Product not found"));
+        IngobokaUserDetails user = SecurityUtils.currentUser();
+        if (!user.hasRole(RoleCodes.PLATFORM_ADMIN)
+                && (user.getOrganizationId() == null
+                        || !product.getOrganizationId().equals(user.getOrganizationId()))) {
+            throw new BusinessException("Product not found");
+        }
+        return product;
     }
 
     private UUID requireTenantOrganizationIdForRead() {

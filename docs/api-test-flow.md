@@ -6,7 +6,7 @@
 | Environment | Base URL |
 |-------------|----------|
 | Local | `http://localhost:8085/api/v1` |
-| Deployed (Kamatera) | `http://185.181.10.165:8085/api/v1` |
+| Deployed (Azure) | `http://4.168.192.169:8085/api/v1` |
 
 Set once in your shell:
 

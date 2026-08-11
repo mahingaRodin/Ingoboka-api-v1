@@ -1,7 +1,10 @@
 package com.ingoboka_api.v1.product.controllers;
 
+import com.ingoboka_api.v1.common.enums.ProductStatus;
 import com.ingoboka_api.v1.common.requests.CreateProductPlanRequest;
 import com.ingoboka_api.v1.common.requests.CreateProductRequest;
+import com.ingoboka_api.v1.common.requests.UnpublishProductRequest;
+import com.ingoboka_api.v1.common.requests.UpdateProductRequest;
 import com.ingoboka_api.v1.common.responses.ApiResponse;
 import com.ingoboka_api.v1.common.responses.PageResponse;
 import com.ingoboka_api.v1.common.responses.ProductDetailResponse;
@@ -19,6 +22,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -49,13 +53,34 @@ public class ProductController {
         return ApiResponse.ok("Product published", productCatalogService.publishProduct(productId));
     }
 
+    @PutMapping("/{productId}")
+    @PreAuthorize("hasAnyRole('INSURER_PRODUCT_MANAGER', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
+    @Operation(summary = "Update product", description = "Update draft product metadata")
+    public ApiResponse<ProductResponse> updateProduct(
+            @PathVariable UUID productId, @Valid @RequestBody UpdateProductRequest request) {
+        return ApiResponse.ok("Product updated", productCatalogService.updateProduct(productId, request));
+    }
+
+    @PostMapping("/{productId}/unpublish")
+    @PreAuthorize("hasAnyRole('INSURER_PRODUCT_MANAGER', 'PARTNER_ADMIN', 'PLATFORM_ADMIN')")
+    @Operation(summary = "Unpublish product", description = "Move a published product back to draft or archive it")
+    public ApiResponse<ProductResponse> unpublishProduct(
+            @PathVariable UUID productId,
+            @RequestBody(required = false) UnpublishProductRequest request) {
+        return ApiResponse.ok(
+                "Product unpublished",
+                productCatalogService.unpublishProduct(productId, request != null ? request : new UnpublishProductRequest()));
+    }
+
     @GetMapping("/tenant")
     @PreAuthorize(
             "hasAnyRole('INSURER_PRODUCT_MANAGER', 'PARTNER_ADMIN', 'CLAIMS_OFFICER', 'CLAIMS_SUPERVISOR', 'PLATFORM_ADMIN')")
     @Operation(summary = "List tenant products", description = "All products for the authenticated insurer tenant")
     public ApiResponse<PageResponse<ProductResponse>> listTenantProducts(
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("Products retrieved", productCatalogService.listTenantProducts(page, size));
+            @RequestParam(required = false) ProductStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok("Products retrieved", productCatalogService.listTenantProducts(status, page, size));
     }
 
     @GetMapping

@@ -1,0 +1,15 @@
+Subject: Claim status updated — {{claimNumber}}
+
+Hello {{fullName}},
+
+A claim in your portfolio has been updated.
+
+Claim: {{claimNumber}}
+Policyholder: {{claimantName}}
+Policy: {{policyNumber}}
+New status: {{statusLabel}}
+{{reason}}
+
+View details: {{claimsUrl}}
+
+— Ingoboka Platform

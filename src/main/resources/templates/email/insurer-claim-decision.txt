@@ -1,0 +1,15 @@
+Subject: Claim decision recorded — {{claimNumber}}
+
+Hello {{fullName}},
+
+A claim decision has been recorded for your organization.
+
+Claim: {{claimNumber}}
+Policyholder: {{claimantName}}
+Policy: {{policyNumber}}
+Decision: {{decision}}
+{{reason}}
+
+View details: {{claimsUrl}}
+
+— Ingoboka Platform
