@@ -1,0 +1,93 @@
+name: Test Build Push
+
+# Branch gate: Maven verify + Docker sanity + k6 smoke (when LOAD_TEST_BASE_URL is set).
+# Merge this branch into staging after green CI.
+
+on:
+  push:
+    branches: [test-build-push-clean]
+  pull_request:
+    branches: [test-build-push-clean, staging]
+  workflow_dispatch:
+
+concurrency:
+  group: test-build-push-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: "21"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build and test
+        run: ./mvnw clean verify -B -Dintegration=true
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+
+      - name: Build Docker image (sanity)
+        run: docker build -t ingoboka-api:${{ github.sha }} .
+
+      - name: Save Docker image artifact
+        run: |
+          docker save ingoboka-api:${{ github.sha }} | gzip > ingoboka-api-image.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ingoboka-api-docker-image
+          path: ingoboka-api-image.tar.gz
+          retention-days: 7
+
+  k6-smoke:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve load-test target
+        id: target
+        env:
+          LOAD_TEST_BASE_URL: ${{ secrets.LOAD_TEST_BASE_URL }}
+        run: |
+          if [ -z "$LOAD_TEST_BASE_URL" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=k6 skipped::Set secret LOAD_TEST_BASE_URL to run k6 smoke in CI."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run k6 smoke
+        if: steps.target.outputs.skip != 'true'
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: load-tests/smoke.js
+        env:
+          BASE_URL: ${{ secrets.LOAD_TEST_BASE_URL }}
+          EMAIL: ${{ secrets.LOAD_TEST_EMAIL }}
+          PASSWORD: ${{ secrets.LOAD_TEST_PASSWORD }}
+
+      - name: k6 smoke skipped
+        if: steps.target.outputs.skip == 'true'
+        run: echo "k6 smoke skipped — configure LOAD_TEST_BASE_URL, LOAD_TEST_EMAIL, LOAD_TEST_PASSWORD secrets."
