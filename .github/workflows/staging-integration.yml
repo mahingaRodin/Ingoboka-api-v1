@@ -1,0 +1,79 @@
+name: Staging Integration
+
+# Full integration tests on staging branch.
+# After green, open PR staging → main for production merge/deploy.
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+    branches: [staging]
+  workflow_dispatch:
+
+concurrency:
+  group: staging-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: "21"
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Full integration test suite
+        run: ./mvnw clean verify -B -Dintegration=true
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-surefire-reports
+          path: target/surefire-reports/
+
+  k6-load-optional:
+    needs: integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve load-test target
+        id: target
+        env:
+          LOAD_TEST_BASE_URL: ${{ secrets.LOAD_TEST_BASE_URL }}
+        run: |
+          if [ -z "$LOAD_TEST_BASE_URL" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=k6 load skipped::Set LOAD_TEST_BASE_URL to run load profile on staging."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run k6 load profile
+        if: steps.target.outputs.skip != 'true'
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: load-tests/load.js
+        env:
+          BASE_URL: ${{ secrets.LOAD_TEST_BASE_URL }}
+          EMAIL: ${{ secrets.LOAD_TEST_EMAIL }}
+          PASSWORD: ${{ secrets.LOAD_TEST_PASSWORD }}
+
+      - name: k6 load skipped
+        if: steps.target.outputs.skip == 'true'
+        run: echo "Optional k6 load skipped — run locally with .\\load-tests\\scripts\\run-load.ps1"
