@@ -1,0 +1,10 @@
+{
+  "name": "ingoboka-api-load-tests",
+  "private": true,
+  "description": "k6 load tests for Ingoboka API critical paths",
+  "scripts": {
+    "smoke": "k6 run smoke.js",
+    "load": "k6 run load.js",
+    "stress": "k6 run stress.js"
+  }
+}
