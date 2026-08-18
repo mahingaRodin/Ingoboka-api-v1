@@ -7,12 +7,13 @@ Production-oriented load tests for critical API paths: health, auth login, produ
 ```
 load-tests/
 ├── README.md
+├── .env.example          # Copy to .env (gitignored)
 ├── package.json
 ├── smoke.js              # CI gate + quick local check (2 VUs, 1 min)
 ├── load.js               # sustained load (ramp to 20 VUs)
 ├── stress.js             # stress profile (ramp to 60 VUs)
 ├── lib/
-│   ├── config.js         # BASE_URL, thresholds, defaults
+│   ├── config.js         # BASE_URL, thresholds, credentials from env
 │   └── auth.js           # login helper
 ├── scenarios/
 │   └── critical-paths.js # shared scenario
@@ -24,37 +25,28 @@ load-tests/
 
 ## Prerequisites
 
-- [k6](https://grafana.com/docs/k6/latest/set-up/install-k6/) installed locally (you already have it on Windows)
+- [k6](https://grafana.com/docs/k6/latest/set-up/install-k6/) installed locally
 - API reachable at `BASE_URL`
-- Demo credentials with access to tenant lists (default: seeded platform admin)
+- A demo/staging login with access to tenant lists (partner demo user from your staging DB works well)
 
 ## Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BASE_URL` | `http://localhost:8085/api/v1` | API base including `/api/v1` |
-| `EMAIL` | `agressive.one04@gmail.com` | Login identifier (email or phone) |
-| `PASSWORD` | `admin@123` | Demo password — **local Docker only** |
+| `EMAIL` | *(required)* | Login identifier (email or phone) |
+| `PASSWORD` | *(required)* | Login password — **never commit** |
 
-**Local Docker** (`docker compose up`): defaults work — seeded platform admin is `agressive.one04@gmail.com` / `admin@123`.
-
-**Azure demo VM** (`http://4.168.192.169:8085`): do **not** rely on platform-admin defaults. That account exists but its password was changed on the VM (`INVALID_PASSWORD`). Use a known-working demo user:
+**Setup:** copy `.env.example` to `.env` and fill in credentials:
 
 ```powershell
-$env:BASE_URL = "http://4.168.192.169:8085/api/v1"
-$env:EMAIL = "eric@demo-insurer.rw"
-$env:PASSWORD = "Ingoboka@2026"
-.\load-tests\scripts\run-smoke.ps1
+Copy-Item load-tests\.env.example load-tests\.env
+# Edit load-tests\.env — EMAIL/PASSWORD from your local deploy/.env or staging secrets
 ```
 
-Also verified on the VM (Aug 2026):
+**Local Docker** (`docker compose up`): use the same `PLATFORM_ADMIN_EMAIL` / `PLATFORM_ADMIN_PASSWORD` from `deploy/.env` (see `deploy/.env.example`).
 
-| User | Identifier | Password | Result |
-|------|------------|----------|--------|
-| Partner admin | `eric@demo-insurer.rw` | `Ingoboka@2026` | 200 — use for k6 smoke |
-| Claims officer | `claims@demo-insurer.rw` | `Ingoboka@2026` | 200 |
-| Platform admin | `agressive.one04@gmail.com` | `admin@123` | 400 `INVALID_PASSWORD` |
-| Citizen | `+250780000001` | `Ingoboka@2026` | 400 account deactivated |
+**Remote / staging:** set `BASE_URL` to your staging API URL and use credentials configured for that environment. Do not paste production passwords into this repo.
 
 Login body must be `{ "identifier": "<email-or-phone>", "password": "..." }` (not `{ email, password }`). The k6 helper already sends `identifier`.
 
@@ -63,13 +55,16 @@ Login body must be `{ "identifier": "<email-or-phone>", "password": "..." }` (no
 From repo root `ingoboka-api`:
 
 ```powershell
-# Smoke (fast gate)
+# Smoke (fast gate) — reads load-tests/.env if present
 .\load-tests\scripts\run-smoke.ps1
 
-# Against Azure VM
-.\load-tests\scripts\run-smoke.ps1 -BaseUrl "http://4.168.192.169:8085/api/v1"
+# Override target or credentials via params / env
+$env:BASE_URL = "https://staging.example.com/api/v1"
+$env:EMAIL = "your-loadtest@example.com"
+$env:PASSWORD = "<from-your-secrets-manager>"
+.\load-tests\scripts\run-smoke.ps1
 
-# Load / stress (run locally or against staging — not in default CI)
+# Load / stress (local or staging — not in default CI)
 .\load-tests\scripts\run-load.ps1
 .\load-tests\scripts\run-stress.ps1
 ```
@@ -79,6 +74,8 @@ Direct `k6` (from `load-tests/`):
 ```powershell
 cd load-tests
 $env:BASE_URL = "http://localhost:8085/api/v1"
+$env:EMAIL = "your-loadtest@example.com"
+$env:PASSWORD = "<from-deploy/.env>"
 k6 run smoke.js
 k6 run load.js
 k6 run stress.js
@@ -118,11 +115,13 @@ feature work → test-build-push → staging → PR → main
 
 ### GitHub secrets (repo → Settings → Secrets)
 
-| Secret | Example | Used by |
-|--------|---------|---------|
-| `LOAD_TEST_BASE_URL` | `http://4.168.192.169:8085/api/v1` | k6 in CI |
-| `LOAD_TEST_EMAIL` | `eric@demo-insurer.rw` | k6 login (use VM-working user, not platform admin) |
-| `LOAD_TEST_PASSWORD` | `Ingoboka@2026` | k6 login |
+| Secret | Description | Used by |
+|--------|-------------|---------|
+| `LOAD_TEST_BASE_URL` | Staging API URL including `/api/v1` | k6 in CI |
+| `LOAD_TEST_EMAIL` | Login identifier for k6 (partner demo user from staging DB) | k6 login |
+| `LOAD_TEST_PASSWORD` | Login password for k6 | k6 login |
+
+Configure these in **Settings → Secrets and variables → Actions**. Never commit secret values to the repository.
 
 If `LOAD_TEST_BASE_URL` is **not** set, CI skips k6 with a notice (Maven + Docker still run).
 

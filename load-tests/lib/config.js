@@ -1,11 +1,10 @@
 /**
  * Shared k6 configuration for Ingoboka API load tests.
  *
- * Env vars:
+ * Env vars (required for login):
  *   BASE_URL  - API root (default http://localhost:8085/api/v1)
- *   EMAIL     - Login identifier (default: local seeded platform admin)
- *   PASSWORD  - Login password (default admin@123 works locally only;
- *               on Azure VM use eric@demo-insurer.rw / Ingoboka@2026)
+ *   EMAIL     - Login identifier (email or phone)
+ *   PASSWORD  - Login password (no default — set via env or load-tests/.env)
  */
 
 export function getBaseUrl() {
@@ -18,10 +17,15 @@ export function getHealthUrl() {
 }
 
 export function getCredentials() {
-  return {
-    identifier: __ENV.EMAIL || 'agressive.one04@gmail.com',
-    password: __ENV.PASSWORD || 'admin@123',
-  };
+  const identifier = __ENV.EMAIL;
+  const password = __ENV.PASSWORD;
+  if (!identifier || !password) {
+    throw new Error(
+      'EMAIL and PASSWORD are required. Copy load-tests/.env.example to load-tests/.env ' +
+        'or export them before running k6.',
+    );
+  }
+  return { identifier, password };
 }
 
 const commonThresholds = {

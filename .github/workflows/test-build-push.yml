@@ -76,7 +76,6 @@ jobs:
             echo "::notice title=k6 skipped::Set secret LOAD_TEST_BASE_URL to run k6 smoke in CI."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "base_url=$LOAD_TEST_BASE_URL" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run k6 smoke
