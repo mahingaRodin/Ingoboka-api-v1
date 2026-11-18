@@ -1,81 +1,39 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: ingoboka-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-ingoboka}
-      POSTGRES_USER: ${POSTGRES_USER:-ingoboka}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ingoboka}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - ingoboka-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ingoboka} -d ${POSTGRES_DB:-ingoboka}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: ingoboka-redis
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ingoboka-nginx
     restart: unless-stopped
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    networks:
-      - ingoboka-net
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  minio:
-    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
-    container_name: ingoboka-minio
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
-    volumes:
-      - minio_data:/data
     ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
     networks:
       - ingoboka-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
 
   api:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-    image: ingoboka-api:${IMAGE_TAG:-latest}
+    image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ingoboka-api
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: docker
-      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ingoboka}
-      DB_USERNAME: ${POSTGRES_USER:-ingoboka}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-ingoboka}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      SPRING_PROFILES_ACTIVE: prod
+      # ── Database (Amazon RDS) ──────────────────────────────────────────────
+      DB_URL: jdbc:postgresql://${RDS_ENDPOINT}:5432/${DB_NAME:-ingoboka}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # ── Cache (Amazon ElastiCache Redis) ──────────────────────────────────
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      # ── S3 Document Storage ───────────────────────────────────────────────
+      S3_REGION: ${S3_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-}
+      # ── Security ──────────────────────────────────────────────────────────
       JWT_SECRET: ${JWT_SECRET}
+      # ── SMTP ──────────────────────────────────────────────────────────────
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
@@ -83,40 +41,29 @@ services:
       MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
       MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-true}
       MAIL_HEALTH_ENABLED: ${MAIL_HEALTH_ENABLED:-false}
-      SEED_PLATFORM_ADMIN: ${SEED_PLATFORM_ADMIN:-true}
-      PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-platform-admin@example.com}
-      PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-change-me-local-admin}
-      PLATFORM_ADMIN_PHONE: ${PLATFORM_ADMIN_PHONE:-+250794415318}
-      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://ingoboka-platform.vercel.app,http://localhost:3000}
-      FRONTEND_LOGIN_URL: ${FRONTEND_LOGIN_URL:-https://ingoboka-platform.vercel.app/en/login}
-      FRONTEND_VERIFY_EMAIL_URL: ${FRONTEND_VERIFY_EMAIL_URL:-https://ingoboka-platform.vercel.app/en/verify-email}
-      FRONTEND_ACTIVATE_ACCOUNT_URL: ${FRONTEND_ACTIVATE_ACCOUNT_URL:-https://ingoboka-platform.vercel.app/en/activate}
-      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://ingoboka-platform.vercel.app/en}
-      BRAND_LOGO_URL: ${BRAND_LOGO_URL:-https://ingoboka-platform.vercel.app/images/brand/ingoboka-logo.svg}
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
-      MINIO_BUCKET: ${MINIO_BUCKET:-ingoboka-documents}
-      OTP_STORAGE: redis
+      # ── Platform admin seed ───────────────────────────────────────────────
+      SEED_PLATFORM_ADMIN: ${SEED_PLATFORM_ADMIN:-false}
+      PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-}
+      PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-}
+      PLATFORM_ADMIN_PHONE: ${PLATFORM_ADMIN_PHONE:-}
+      # ── Frontend / CORS ───────────────────────────────────────────────────
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      FRONTEND_LOGIN_URL: ${FRONTEND_LOGIN_URL}
+      FRONTEND_VERIFY_EMAIL_URL: ${FRONTEND_VERIFY_EMAIL_URL}
+      FRONTEND_ACTIVATE_ACCOUNT_URL: ${FRONTEND_ACTIVATE_ACCOUNT_URL}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
+      BRAND_LOGO_URL: ${BRAND_LOGO_URL}
+      # ── OTP / SMS / USSD ──────────────────────────────────────────────────
+      OTP_STORAGE: ${OTP_STORAGE:-redis}
       OTP_DELIVERY_CHANNEL: ${OTP_DELIVERY_CHANNEL:-email}
-      MTN_BULK_SMS_ENABLED: ${MTN_BULK_SMS_ENABLED:-false}
       AFRICASTALKING_SMS_ENABLED: ${AFRICASTALKING_SMS_ENABLED:-false}
       AFRICASTALKING_USERNAME: ${AFRICASTALKING_USERNAME:-sandbox}
       AFRICASTALKING_API_KEY: ${AFRICASTALKING_API_KEY:-}
-      AFRICASTALKING_SMS_API_URL: ${AFRICASTALKING_SMS_API_URL:-https://api.sandbox.africastalking.com/version1/messaging}
-      AFRICASTALKING_SMS_FROM: ${AFRICASTALKING_SMS_FROM:-}
-      USSD_ENABLED: ${USSD_ENABLED:-true}
+      USSD_ENABLED: ${USSD_ENABLED:-false}
       USSD_SERVICE_CODE: ${USSD_SERVICE_CODE:-*477#}
       USSD_GATEWAY_API_KEY: ${USSD_GATEWAY_API_KEY:-}
       USSD_SESSION_TTL_SECONDS: ${USSD_SESSION_TTL_SECONDS:-120}
       USSD_SESSION_STORAGE: ${USSD_SESSION_STORAGE:-redis}
-    ports:
-      - "${API_PORT:-8085}:8080"
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     networks:
       - ingoboka-net
     healthcheck:
@@ -129,8 +76,3 @@ services:
 networks:
   ingoboka-net:
     driver: bridge
-
-volumes:
-  postgres_data:
-  redis_data:
-  minio_data:

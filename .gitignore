@@ -16,7 +16,6 @@ target/
 ### IntelliJ IDEA ###
 .idea
 *.iws
-temp_auto_push.bat
 *.iml
 *.ipr
 
@@ -31,11 +30,8 @@ build/
 !**/src/test/**/build/
 
 ### VS Code ###
+.vscode/
 
 ### Environment ###
 deploy/.env
 load-tests/.env
-.gitignore
-branch_structure.json
-config.bat
-node_modules
