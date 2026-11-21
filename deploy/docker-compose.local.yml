@@ -5,15 +5,15 @@ services:
     container_name: ingoboka-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ingoboka
-      POSTGRES_USER: ingoboka
-      POSTGRES_PASSWORD: ingoboka_local
+      POSTGRES_DB: ${POSTGRES_DB:-ingoboka}
+      POSTGRES_USER: ${POSTGRES_USER:-ingoboka}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - ingoboka-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ingoboka -d ingoboka"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ingoboka} -d ${POSTGRES_DB:-ingoboka}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -37,16 +37,22 @@ services:
     image: ingoboka-api:latest
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      DB_URL: jdbc:postgresql://postgres:5432/ingoboka
-      DB_USERNAME: ingoboka
-      DB_PASSWORD: ingoboka_local
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ingoboka}
+      DB_USERNAME: ${POSTGRES_USER:-ingoboka}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - ingoboka-net
+
+networks:
+  ingoboka-net:
+    driver: bridge
 
 volumes:
   postgres_data:
