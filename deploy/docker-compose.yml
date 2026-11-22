@@ -41,20 +41,23 @@ services:
       MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
       MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-true}
       MAIL_HEALTH_ENABLED: ${MAIL_HEALTH_ENABLED:-false}
-      # ── Platform admin seed ───────────────────────────────────────────────
-      SEED_PLATFORM_ADMIN: ${SEED_PLATFORM_ADMIN:-false}
-      PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-}
-      PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-}
-      PLATFORM_ADMIN_PHONE: ${PLATFORM_ADMIN_PHONE:-}
-      # ── Frontend / CORS ───────────────────────────────────────────────────
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
-      FRONTEND_LOGIN_URL: ${FRONTEND_LOGIN_URL}
-      FRONTEND_VERIFY_EMAIL_URL: ${FRONTEND_VERIFY_EMAIL_URL}
-      FRONTEND_ACTIVATE_ACCOUNT_URL: ${FRONTEND_ACTIVATE_ACCOUNT_URL}
-      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
-      BRAND_LOGO_URL: ${BRAND_LOGO_URL}
-      # ── OTP / SMS / USSD ──────────────────────────────────────────────────
-      OTP_STORAGE: ${OTP_STORAGE:-redis}
+      SEED_PLATFORM_ADMIN: ${SEED_PLATFORM_ADMIN:-true}
+      PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-platform-admin@example.com}
+      PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-change-me-local-admin}
+      PLATFORM_ADMIN_PHONE: ${PLATFORM_ADMIN_PHONE:-+250794415318}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://ingoboka-platform.vercel.app,http://localhost:3000}
+      FRONTEND_LOGIN_URL: ${FRONTEND_LOGIN_URL:-https://ingoboka-platform.vercel.app/en/login}
+      FRONTEND_VERIFY_EMAIL_URL: ${FRONTEND_VERIFY_EMAIL_URL:-https://ingoboka-platform.vercel.app/en/verify-email}
+      FRONTEND_ACTIVATE_ACCOUNT_URL: ${FRONTEND_ACTIVATE_ACCOUNT_URL:-https://ingoboka-platform.vercel.app/en/activate}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://ingoboka-platform.vercel.app/en}
+      BRAND_LOGO_URL: ${BRAND_LOGO_URL:-https://ingoboka-platform.vercel.app/images/brand/ingoboka-logo.svg}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-ingoboka-documents}
+      OTP_STORAGE: redis
       OTP_DELIVERY_CHANNEL: ${OTP_DELIVERY_CHANNEL:-email}
       AFRICASTALKING_SMS_ENABLED: ${AFRICASTALKING_SMS_ENABLED:-false}
       AFRICASTALKING_USERNAME: ${AFRICASTALKING_USERNAME:-sandbox}
