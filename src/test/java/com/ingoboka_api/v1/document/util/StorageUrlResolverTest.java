@@ -26,6 +26,7 @@ class StorageUrlResolverTest {
 
     @Test
     void returnsExternalUrlUnchanged() {
+        // Absolute URLs (e.g. already a CDN link) pass through without calling S3
         String url = "https://cdn.example.com/avatar.jpg";
 
         assertThat(resolver.resolveDownloadUrl(url)).isEqualTo(url);
@@ -33,27 +34,19 @@ class StorageUrlResolverTest {
     }
 
     @Test
-    void presignsStorageKeyWhenMinioEnabled() {
-        minioProperties.setPublicEndpoint("http://20.1.2.3:9000");
+    void presignsStorageKeyWhenS3Enabled() {
+        // S3 presigned URLs are always browser-reachable — URL is generated
         when(documentStorageService.presignedDownloadUrl("users/abc/profile.jpg"))
-                .thenReturn("http://20.1.2.3:9000/ingoboka-documents/users/abc/profile.jpg?X-Amz-Signature=abc");
+                .thenReturn("https://my-bucket.s3.us-east-1.amazonaws.com/users/abc/profile.jpg?X-Amz-Signature=abc");
 
         String resolved = resolver.resolveDownloadUrl("users/abc/profile.jpg");
 
-        assertThat(resolved).contains("20.1.2.3:9000");
+        assertThat(resolved).contains("amazonaws.com");
     }
 
     @Test
-    void returnsNullWhenPublicEndpointNotBrowserReachable() {
-        minioProperties.setEndpoint("http://minio:9000");
-        minioProperties.setPublicEndpoint(null);
-
-        assertThat(resolver.resolveDownloadUrl("users/abc/profile.jpg")).isNull();
-        verifyNoInteractions(documentStorageService);
-    }
-
-    @Test
-    void returnsNullWhenMinioDisabled() {
+    void returnsNullWhenS3Disabled() {
+        // When S3 is disabled, no URL can be generated
         minioProperties.setEnabled(false);
 
         assertThat(resolver.resolveDownloadUrl("users/abc/profile.jpg")).isNull();
@@ -61,9 +54,14 @@ class StorageUrlResolverTest {
     }
 
     @Test
-    void returnsNullForClaimEvidenceObjectKeys() {
-        minioProperties.setPublicEndpoint("http://20.1.2.3:9000");
+    void returnsNullForNullObjectKey() {
+        assertThat(resolver.resolveDownloadUrl(null)).isNull();
+        verifyNoInteractions(documentStorageService);
+    }
 
+    @Test
+    void returnsNullForClaimEvidenceObjectKeys() {
+        // Claim evidence is served via the API proxy, never via presigned URLs
         assertThat(resolver.resolveDownloadUrl("docs/user/CLAIM_EVIDENCE-abc.pdf")).isNull();
         verifyNoInteractions(documentStorageService);
     }

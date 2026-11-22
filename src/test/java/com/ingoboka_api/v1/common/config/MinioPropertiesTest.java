@@ -7,30 +7,42 @@ import org.junit.jupiter.api.Test;
 class MinioPropertiesTest {
 
     @Test
-    void effectivePublicEndpointFallsBackToInternalEndpoint() {
+    void isPublicEndpointBrowserReachableReturnsTrueWhenEnabled() {
         MinioProperties props = new MinioProperties();
-        props.setEndpoint("http://minio:9000");
+        props.setEnabled(true);
 
-        assertThat(props.getEffectivePublicEndpoint()).isEqualTo("http://minio:9000");
-        assertThat(props.isPublicEndpointBrowserReachable()).isFalse();
-    }
-
-    @Test
-    void effectivePublicEndpointUsesConfiguredPublicHost() {
-        MinioProperties props = new MinioProperties();
-        props.setEndpoint("http://minio:9000");
-        props.setPublicEndpoint("http://20.1.2.3:9000");
-
-        assertThat(props.getEffectivePublicEndpoint()).isEqualTo("http://20.1.2.3:9000");
+        // S3 presigned URLs are always browser-reachable when storage is enabled
         assertThat(props.isPublicEndpointBrowserReachable()).isTrue();
     }
 
     @Test
-    void effectivePublicEndpointIgnoresBlankOverride() {
+    void isPublicEndpointBrowserReachableReturnsFalseWhenDisabled() {
         MinioProperties props = new MinioProperties();
-        props.setEndpoint("http://localhost:9000");
-        props.setPublicEndpoint("   ");
+        props.setEnabled(false);
 
-        assertThat(props.getEffectivePublicEndpoint()).isEqualTo("http://localhost:9000");
+        assertThat(props.isPublicEndpointBrowserReachable()).isFalse();
+    }
+
+    @Test
+    void hasPublicBaseUrlReturnsFalseWhenNotConfigured() {
+        MinioProperties props = new MinioProperties();
+
+        assertThat(props.hasPublicBaseUrl()).isFalse();
+    }
+
+    @Test
+    void hasPublicBaseUrlReturnsTrueWhenCloudFrontUrlConfigured() {
+        MinioProperties props = new MinioProperties();
+        props.setPublicBaseUrl("https://cdn.example.com");
+
+        assertThat(props.hasPublicBaseUrl()).isTrue();
+    }
+
+    @Test
+    void hasPublicBaseUrlReturnsFalseForBlankValue() {
+        MinioProperties props = new MinioProperties();
+        props.setPublicBaseUrl("   ");
+
+        assertThat(props.hasPublicBaseUrl()).isFalse();
     }
 }
