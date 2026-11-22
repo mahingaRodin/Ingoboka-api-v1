@@ -16,7 +16,6 @@ target/
 ### IntelliJ IDEA ###
 .idea
 *.iws
-temp_auto_push.bat
 *.iml
 *.ipr
 
@@ -31,20 +30,13 @@ build/
 !**/src/test/**/build/
 
 ### VS Code ###
-.vscode/
 
 ### Environment ###
-.env
-.env.*
-!.env.example
 deploy/.env
-deploy/.env.*
-!deploy/.env.example
 load-tests/.env
-load-tests/.env.*
-!load-tests/.env.example
-result.txt
-prompt.txt
 branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore
 config.bat
 node_modules
